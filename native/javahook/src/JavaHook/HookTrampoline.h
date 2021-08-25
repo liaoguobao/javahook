@@ -6,7 +6,8 @@
 class CHookTrampoline
 {
 protected:
-    unsigned int num;
+    unsigned int origin;
+    unsigned int backup;
     unsigned char *code;
 
 protected:
@@ -17,7 +18,8 @@ public:
     static CHookTrampoline * GetInstance();
 
 public:
-    const unsigned char * CreateTrampoline(void *art_method, unsigned char offset_compiled_code);
+    const unsigned char * CreateOriginTrampoline(void *hook_art_method, unsigned char offset_compiled_code);
+    const unsigned char * CreateBackupTrampoline(void *orig_art_method, void *orig_compiled_code);
 };
 
 #endif

@@ -1455,11 +1455,11 @@ public:
             if(clazz)
                 return clazz;
 
-            CJniObj app(env, CJniUtil::GetCurrentApplication(env));
-            loader_.Attach(env, CJniUtil::CallObjectMethod(env, app, "getClassLoader", "()Ljava/lang/ClassLoader;").l);
+            CJniObj app(env, GetCurrentApplication(env));
+            loader_.Attach(env, CallObjectMethod(env, app, "getClassLoader", "()Ljava/lang/ClassLoader;").l);
             loader = loader_;
         }
-        jclass clazz = (jclass)CallClassMethod(env, "java/lang/Class", "forName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;", name_.GetObject(), init, loader).l;
+        jclass clazz = !loader?0:(jclass)CallClassMethod(env, "java/lang/Class", "forName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;", name_.GetObject(), init, loader).l;
         return clazz;
     }
 };

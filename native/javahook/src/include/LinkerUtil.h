@@ -63,7 +63,17 @@ public:
         {
             //7.0及以上版本会进到这里，注意第四个参数设置了open函数的地址，告诉linker,此次调用是从libc中发起，从而绕过dlopen打开动态库的限制，
             //dlopen默认情况下不可以加载/system/lib目录下的尚未加载的动态库，对已加载的/system/lib下的动态库除了/etc/public.libraries.txt文件指定的外，其它动态库在调用dlsym函数时都是返回0
-            return do_dlopen(filename, flag, 0, (void *)::open);
+            void *handle = do_dlopen(filename, flag, 0, (void *)::open);
+            if(handle)//7.0\7.1\8.0\8.1会在这里提前返回
+                return handle;
+
+            size_t base; string path;
+            const char *n = strrchr(filename, '/');
+            CProcMaps::GetModulePathAndBase(n?n+1:filename, path, base);
+
+            //9.0及以上版本会进到这里，注意第四个参数设置了模块本身的基地址，告诉linker,此次调用是动态库自身发起，从而绕过dlopen打开动态库的限制，
+            //dlopen默认情况下不可以加载/system/lib目录下的尚未加载的动态库，对已加载的/system/lib下的动态库除了/etc/public.libraries.txt文件指定的外，其它动态库在调用dlsym函数时都是返回0
+            return do_dlopen(filename, flag, 0, base?(void *)base:(void *)::open);
         }
         return 0;
     }

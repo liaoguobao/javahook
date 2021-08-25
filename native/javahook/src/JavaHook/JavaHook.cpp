@@ -305,8 +305,9 @@ BOOL CJavaHook::ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_ba
     if(!orig || !back || !hook)
         return FALSE;
 
-    const unsigned char *trampoline = CHookTrampoline::GetInstance()->CreateTrampoline(hook, (unsigned char)g_offsetCompiledCode);
-    if(!trampoline)
+    const unsigned char *tramp_origin = CHookTrampoline::GetInstance()->CreateOriginTrampoline(hook, (unsigned char)g_offsetCompiledCode);
+    //const unsigned char *tramp_backup = CHookTrampoline::GetInstance()->CreateBackupTrampoline(orig, *(void **)((char *)orig + g_offsetCompiledCode));
+    if(!tramp_origin)
         return FALSE;
 
     if(g_sdkver >= Nougat_7_0)
@@ -330,9 +331,11 @@ BOOL CJavaHook::ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_ba
     if(g_sdkver <= Marshmallow_6_0)
     {
         //7.0及以后的版本去掉了entry_point_from_interpreter_字段
+        //*(unsigned *)((char *)back + g_offsetInterpreterCode) = *(unsigned *)((char *)orig + g_offsetInterpreterCode);
         *(unsigned *)((char *)orig + g_offsetInterpreterCode) = *(unsigned *)((char *)hook + g_offsetInterpreterCode);
     }
-    *(unsigned *)((char *)orig + g_offsetCompiledCode) = (unsigned)trampoline;
+    //*(unsigned *)((char *)back + g_offsetCompiledCode) = (unsigned)tramp_backup;//设置跳板并不能修复任何问题，反而会引起问题，这里先注释掉
+    *(unsigned *)((char *)orig + g_offsetCompiledCode) = (unsigned)tramp_origin;
 
     //确保备份方法为私有方法，修复如下异常：java.lang.IllegalArgumentException: Wrong number of arguments; expected 1, got 0
     *(unsigned *)((char *)back + g_offsetAccessFlags) &= ~(kAccPublic | kAccProtected);//~(ACC_PUBLIC | ACC_PROTECTED)
@@ -435,8 +438,8 @@ BOOL CJavaHook::LoadDexFile(JNIEnv *env, const char *dexfile, int opt)
         return FALSE;//已经加载完成了
 
     string oatfile = apptweak + strrchr(dexfile, '/');
-    if(opt && !OptDexFile(env, dexfile, oatfile.c_str()))
-        return FALSE;
+    if(opt && g_sdkver<=__ANDROID_API_P__ && !OptDexFile(env, dexfile, oatfile.c_str()))
+        return FALSE; //Android10及以后版本不再允许从应用进程调用dex2oat
 
     CBaseToJava dexPath(env, dexfile);
     CBaseToJava optPath(env, apptweak.c_str());

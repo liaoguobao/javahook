@@ -5,12 +5,14 @@
 #include "HookTrampoline.h"
 #include "hook_trampoline_arm.h"
 
-extern "C" void replacement_hook_trampoline();
+extern "C" void replacement_origin_trampoline();
+extern "C" void replacement_backup_trampoline();
 extern "C" void __clear_cache(void *beg, void *end);
 
 CHookTrampoline::CHookTrampoline()
 {
-    num = 0;
+    backup = 0;
+    origin = 0;
     code = (unsigned char *)mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_PRIVATE, -1, 0);
 }
 
@@ -25,22 +27,42 @@ CHookTrampoline * CHookTrampoline::GetInstance()
     return &thiz;
 }
 
-const unsigned char * CHookTrampoline::CreateTrampoline(void *art_method, unsigned char offset_compiled_code)
+const unsigned char * CHookTrampoline::CreateOriginTrampoline(void *hook_art_method, unsigned char offset_compiled_code)
 {
-    if(!art_method || !code || num>=MAX_REPLACEMENT_HOOK_TRAMPOLINE)
+    if(!hook_art_method || !code || origin>=MAX_REPLACE_TRAMPOLINE_INDEX)
         return 0;
 
     mprotect(code, PAGE_SIZE, PROT_READ|PROT_EXEC|PROT_WRITE);
 
-    unsigned char *codeaddr = code + num*SIZE_REPLACEMENT_HOOK_TRAMPOLINE;
-    memcpy(codeaddr, (void *)replacement_hook_trampoline, SIZE_REPLACEMENT_HOOK_TRAMPOLINE);
+    unsigned char *codeaddr = code + origin*REPLACE_TRAMPOLINE_SIZE;
+    memcpy(codeaddr, (void *)replacement_origin_trampoline, ORIGIN_REPLACE_TRAMPOLINE_SIZE);
 
-    *(void **)&codeaddr[ADDRESS_REPLACEMENT_ART_METHOD] = art_method;
-    *(unsigned char *)&codeaddr[ADDRESS_REPLACEMENT_COMPILED_CODE] = offset_compiled_code;
+    *(void **)&codeaddr[HOOK_ART_METHOD_ADDRESS] = hook_art_method;
+    *(unsigned char *)&codeaddr[HOOK_COMPILED_CODE_OFFSET] = offset_compiled_code;
 
     mprotect(code, PAGE_SIZE, PROT_READ|PROT_EXEC);
     __clear_cache(code, code+PAGE_SIZE);
 
-    num++;
+    origin++;
+    return codeaddr;
+}
+
+const unsigned char * CHookTrampoline::CreateBackupTrampoline(void *orig_art_method, void *orig_compiled_code)
+{
+    if(!orig_art_method || !code || backup>=MAX_REPLACE_TRAMPOLINE_INDEX)
+        return 0;
+
+    mprotect(code, PAGE_SIZE, PROT_READ|PROT_EXEC|PROT_WRITE);
+
+    unsigned char *codeaddr = code + backup*REPLACE_TRAMPOLINE_SIZE + ORIGIN_REPLACE_TRAMPOLINE_SIZE;
+    memcpy(codeaddr, (void *)replacement_backup_trampoline, BACKUP_REPLACE_TRAMPOLINE_SIZE);
+
+    *(void **)&codeaddr[ORIG_ART_METHOD_ADDRESS] = orig_art_method;
+    *(void **)&codeaddr[ORIG_COMPILED_CODE_ADDRESS] = orig_compiled_code;
+
+    mprotect(code, PAGE_SIZE, PROT_READ|PROT_EXEC);
+    __clear_cache(code, code+PAGE_SIZE);
+
+    backup++;
     return codeaddr;
 }

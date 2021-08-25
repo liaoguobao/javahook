@@ -67,9 +67,11 @@ extern "C" JNIEXPORT int JNI_OnLoad(JavaVM *vm, void *reserved)
 
     CJavaHook::InitJavaHook(vm);
 
-    if(g_sdkver >= 22) //5.1
+    if(g_sdkver>=29) //>=10.0
+        MSHookFunction((void *)CLinkerUtil::dlsym("libart.so", "_ZN3art11ClassLinker11DefineClassEPNS_6ThreadEPKcjNS_6HandleINS_6mirror11ClassLoaderEEERKNS_7DexFileERKNS_3dex8ClassDefE"), (void *)new_ART_ClassLinker_DefineClass, (void **)&old_ART_ClassLinker_DefineClass);
+    else if(g_sdkver>=22 && g_sdkver<=28) //5.1\6.0\7.0\7.1\8.0\8.1\9.0
         MSHookFunction((void *)CLinkerUtil::dlsym("libart.so", "_ZN3art11ClassLinker11DefineClassEPNS_6ThreadEPKcjNS_6HandleINS_6mirror11ClassLoaderEEERKNS_7DexFileERKNS9_8ClassDefE"), (void *)new_ART_ClassLinker_DefineClass, (void **)&old_ART_ClassLinker_DefineClass);
-    if(g_sdkver == 21) //5.0
+    else if(g_sdkver==21) //==5.0
         MSHookFunction((void *)CLinkerUtil::dlsym("libart.so", "_ZN3art11ClassLinker11DefineClassEPKcNS_6HandleINS_6mirror11ClassLoaderEEERKNS_7DexFileERKNS7_8ClassDefE"), (void *)new_ART_ClassLinker_DefineClass_5_0, (void **)&old_ART_ClassLinker_DefineClass_5_0);
 
     __javahook_initbridge__();
