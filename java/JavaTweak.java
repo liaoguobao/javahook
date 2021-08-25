@@ -23,12 +23,14 @@ class JavaTweak_demo {
             return;
         }
         //如果需hook的类在javatweak.dex加载前就已经加载，可以采用下面这种判断方式hook方法
-        if (!hooked1 && JavaTweakBridge.hookJavaMethod("android.telephony.TelephonyManager", "getDeviceId")) {
+        if (!hooked1) {
             hooked1 = true;
+            JavaTweakBridge.hookJavaMethod("android.telephony.TelephonyManager", "getDeviceId");
         }
         //如果需hook的方法在类中有重载方法，hook时必须显示指定方法参数，如果无重载方法，则可以省略参数声明
-        if (!hooked2 && JavaTweakBridge.hookJavaMethod("android.widget.Toast", "makeText(android.content.Context,java.lang.CharSequence,int)")) {
+        if (!hooked2) {
             hooked2 = true;
+            JavaTweakBridge.hookJavaMethod("android.widget.Toast", "makeText(android.content.Context,java.lang.CharSequence,int)");
         }
     }
 
