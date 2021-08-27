@@ -18,7 +18,7 @@ public:
     static int OptDexFile(JNIEnv *env, const char *dexfile, const char *oatfile);
 
     static jobject BackupMethod(JNIEnv *env, jobject method);
-    static int     ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_back, jobject method_hook);
+    static int     ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_back, jobject method_hook, int is_uninit = 0);
 
     static jobject FindClassMethod(JNIEnv *env, jclass clazz, const char *method);
     static jobject FindClassMethod(JNIEnv *env, const char *clazz, const char *method);

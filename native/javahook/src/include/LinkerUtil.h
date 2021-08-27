@@ -20,6 +20,8 @@ public:
     static void* dlopen(const char *filename, int flag)
     {
         static void* (*do_dlopen)(const char *filename, int flag, const void* extinfo, const void* caller_addr) = 0;
+        if(!filename || !*filename)
+            return 0;
 
         int sdkver = 0;
         if(!do_dlopen)
@@ -34,25 +36,13 @@ public:
         }
         if(sdkver>=24)
         {
-            string elf;
-            if(!CFileUtil::ReadBinDataFromFile("/system/bin/linker", elf))
-                return 0;
-
-            size_t base; string path;
-            if(!CProcMaps::GetModulePathAndBase("linker", path, base))
-                return 0;
-
             const char *symbol = 0;
             if(sdkver==24 || sdkver==25)//7.0\7.1
                 symbol = "__dl__Z9do_dlopenPKciPK17android_dlextinfoPv"; //void* do_dlopen(const char* filename, int flags, const android_dlextinfo* extinfo,       void* caller_addr)
             else//>=8.0
                 symbol = "__dl__Z9do_dlopenPKciPK17android_dlextinfoPKv";//void* do_dlopen(const char* filename, int flags, const android_dlextinfo* extinfo, const void* caller_addr)
 
-            unsigned offset_do_dlopen = CElfUtil::GetSym_offset((unsigned char *)elf.c_str(), symbol);
-            if(!offset_do_dlopen)
-                return 0;
-
-            *(void **)&do_dlopen = (void *)(base + offset_do_dlopen);
+            *(void **)&do_dlopen = elfsym("/system/bin/linker", symbol);
         }
         if((void *)do_dlopen == (void *)-1)
         {
@@ -79,10 +69,38 @@ public:
     }
     static void* dlsym(const char *filename, const char *symbol, int isclose = 1)
     {
+        if(!filename || !*filename)
+            return 0;
+        if(!symbol || !*symbol)
+            return 0;
+
         void *h = CLinkerUtil::dlopen(filename, 0);
         void *s = h ? ::dlsym(h, symbol) : 0;
         if(isclose && h) ::dlclose(h);
         return s;
+    }
+    static void* elfsym(const char *filename, const char *symbol)
+    {
+        if(!filename || !*filename)
+            return 0;
+        if(!symbol || !*symbol)
+            return 0;
+
+        size_t base; string path;
+        const char *n = strrchr(filename, '/');
+        if(!CProcMaps::GetModulePathAndBase(n?n+1:filename, path, base))
+            return 0;
+
+        string elf;
+        if(!CFileUtil::ReadBinDataFromFile(path.c_str(), elf))
+            return 0;
+
+        unsigned offset_sym = CElfUtil::GetSym_offset((unsigned char *)elf.c_str(), symbol);
+        if(!offset_sym)
+            return 0;
+
+        void *sym = (void *)(base + offset_sym);
+        return sym;
     }
 };
 

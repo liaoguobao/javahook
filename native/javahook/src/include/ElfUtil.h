@@ -98,6 +98,9 @@ public:
     {
         if(!elf || !st_name || !*st_name)
             return 0;
+        const Elf32_Phdr *phdr_dyna = GetPhdr(elf, PT_LOAD);
+        if(!phdr_dyna)
+            return 0;
 
         const Elf32_Sym *sym = 0;
         if(!sym)
@@ -105,7 +108,7 @@ public:
         if(!sym)
             sym = GetSym(elf, st_name, 0);
 
-        Elf32_Addr addr = sym ? sym->st_value : 0;
+        Elf32_Addr addr = sym ? sym->st_value-phdr_dyna->p_vaddr : 0;
         return addr;
     }
     static const Elf32_Rel* GetRel(const unsigned char *elf, const char *st_name, int isplt = 1)
@@ -136,6 +139,9 @@ public:
     {
         if(!elf || !st_name || !*st_name)
             return 0;
+        const Elf32_Phdr *phdr_dyna = GetPhdr(elf, PT_LOAD);
+        if(!phdr_dyna)
+            return 0;
 
         const Elf32_Rel *rel = 0;
         if(!rel)
@@ -143,7 +149,7 @@ public:
         if(!rel)
             rel = GetRel(elf, st_name, 0);
 
-        Elf32_Addr addr = rel ? rel->r_offset : 0;
+        Elf32_Addr addr = rel ? rel->r_offset-phdr_dyna->p_vaddr : 0;
         return addr;
     }
     static const Elf32_Dyn* GetDyn_needed(const unsigned char *elf, const char *so_name)

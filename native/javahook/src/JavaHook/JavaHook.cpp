@@ -4,13 +4,18 @@
 #include "HookTrampoline.h"
 #include "hook_trampoline_arm.h"
 #include "../include/JniUtil.h"
+#include "../include/LinkerUtil.h"
 //#include "../include/DebugUtil.h"
 
 static const char*  g_sdkverStr[] = {"KitKat_4_4", "KitKat_4_4W", "Lollipop_5_0", "Lollipop_5_1", "Marshmallow_6_0", "Nougat_7_0", "Nougat_7_1", "Oreo_8_0", "Oreo_8_1", "Pie_9_0", "AndroidQ_10_0", "AndroidR_11_0"};
 static void*        (*ART_Runtime_CreateResolutionMethod)(void* thiz) = 0; //ArtMethod* Runtime::CreateResolutionMethod();
 static void*        g_runtime = 0;
+static void*        g_ArtQuickToInterpreterBridge = 0;
+static void*        g_ArtQuickGenericJniTrampoline = 0;
+static void*        g_ArtJniDlsymLookupStub = 0;
 static unsigned     g_sizeofArtMethod = 0;
 static unsigned     g_offsetAccessFlags = 0;
+static unsigned     g_offsetHotnessCount = 0;
 static unsigned     g_offsetInterpreterCode = 0;
 static unsigned     g_offsetJniCode = 0;
 static unsigned     g_offsetCompiledCode = 0;
@@ -57,9 +62,19 @@ BOOL CJavaHook::InitJavaHook(JavaVM *vm)
     if(!ART_Runtime_CreateResolutionMethod)
     {
         //ART_Runtime_CreateResolutionMethod函数所有版本虚拟机都会导出，且接口参数一致
-        void *handle = dlopen("libart.so", 0);
-        *(void **)&ART_Runtime_CreateResolutionMethod = dlsym(handle, "_ZN3art7Runtime22CreateResolutionMethodEv");
-        dlclose(handle);
+        *(void **)&ART_Runtime_CreateResolutionMethod = CLinkerUtil::dlsym("libart.so", "_ZN3art7Runtime22CreateResolutionMethodEv");
+    }
+    if(!g_ArtQuickToInterpreterBridge)
+    {
+        *(void **)&g_ArtQuickToInterpreterBridge = CLinkerUtil::elfsym("libart.so", "art_quick_to_interpreter_bridge");
+    }
+    if(!g_ArtQuickGenericJniTrampoline)
+    {
+        *(void **)&g_ArtQuickGenericJniTrampoline = CLinkerUtil::elfsym("libart.so", "art_quick_generic_jni_trampoline");
+    }
+    if(!g_ArtJniDlsymLookupStub)
+    {
+        *(void **)&g_ArtJniDlsymLookupStub = CLinkerUtil::elfsym("libart.so", "art_jni_dlsym_lookup_stub");
     }
     if(!g_offsetCompiledCode)
     {
@@ -122,6 +137,27 @@ BOOL CJavaHook::InitJavaHook(JavaVM *vm)
             }
         }
     }
+    if(g_sdkver >= Nougat_7_0)
+    {
+        //7.0及以后的版本才有hotness_count_字段
+        if(!g_offsetHotnessCount)
+        {
+            CJniEnv env(vm);
+            CJniObj toStringMethod(env, FindClassMethod(env, "java.lang.Object", "toString()"));
+
+            uint32_t* artMethod = (uint32_t *)env->FromReflectedMethod(toStringMethod);
+            uint32_t dexMethodIndex = CJniUtil::GetObjectField(env, toStringMethod, "dexMethodIndex", "I").i;
+
+            for(int i = 0; i < g_sizeofArtMethod/sizeof(uint32_t); ++i)
+            {
+                if(artMethod[i] == dexMethodIndex)
+                {
+                    g_offsetHotnessCount = (i+1) * sizeof(uint32_t) + sizeof(uint16_t);
+                    break;
+                }
+            }
+        }
+    }
     if(g_sdkver>=Nougat_7_0 && g_sdkver<=Oreo_8_0)
     {
         g_kAccCompileDontBother = 0x01000000;
@@ -130,7 +166,7 @@ BOOL CJavaHook::InitJavaHook(JavaVM *vm)
     {
         g_kAccCompileDontBother = 0x02000000;
     }
-    //CDebugUtil::WriteToLogcat("sdkverStr=%s, runtime=%p, CreateResolutionMethod=%p, sizeofArtMethod=%d, offsetAccessFlags=%d, offsetInterpreterCode=%d, offsetJniCode=%d, offsetCompiledCode=%d\r\n", g_sdkverStr[g_sdkver-__ANDROID_API_MIN__], g_runtime, ART_Runtime_CreateResolutionMethod, g_sizeofArtMethod, g_offsetAccessFlags, g_offsetInterpreterCode, g_offsetJniCode, g_offsetCompiledCode);
+    //CDebugUtil::WriteToLogcat("sdkverStr=%s, runtime=%p, ArtQuickGenericJniTrampoline=%p, ArtQuickToInterpreterBridge=%p, ArtJniDlsymLookupStub=%p, CreateResolutionMethod=%p, sizeofArtMethod=%d, offsetAccessFlags=%d, offsetHotnessCount=%d, offsetInterpreterCode=%d, offsetJniCode=%d, offsetCompiledCode=%d\r\n", g_sdkverStr[g_sdkver-__ANDROID_API_MIN__], g_runtime, g_ArtQuickGenericJniTrampoline, g_ArtQuickToInterpreterBridge, g_ArtJniDlsymLookupStub, ART_Runtime_CreateResolutionMethod, g_sizeofArtMethod, g_offsetAccessFlags, g_offsetHotnessCount, g_offsetInterpreterCode, g_offsetJniCode, g_offsetCompiledCode);
     return TRUE;
 }
 
@@ -291,7 +327,7 @@ jobject CJavaHook::BackupMethod(JNIEnv *env, jobject method)
     return backupMethod.Detach();
 }
 
-BOOL CJavaHook::ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_back, jobject method_hook)
+BOOL CJavaHook::ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_back, jobject method_hook, int is_uninit)
 {
     if(!env || !method_orig || !method_back || !method_hook)
         return FALSE;
@@ -305,16 +341,18 @@ BOOL CJavaHook::ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_ba
     if(!orig || !back || !hook)
         return FALSE;
 
-    const unsigned char *tramp_origin = CHookTrampoline::GetInstance()->CreateOriginTrampoline(hook, (unsigned char)g_offsetCompiledCode);
-    //const unsigned char *tramp_backup = CHookTrampoline::GetInstance()->CreateBackupTrampoline(orig, *(void **)((char *)orig + g_offsetCompiledCode));
-    if(!tramp_origin)
-        return FALSE;
-
     if(g_sdkver >= Nougat_7_0)
     {
         //kAccCompileDontBother(0x01000000),禁用 JIT
         *(unsigned *)((char *)back + g_offsetAccessFlags) |= g_kAccCompileDontBother;
         *(unsigned *)((char *)orig + g_offsetAccessFlags) |= g_kAccCompileDontBother;
+    }
+    int isAbstract = *(unsigned *)((char *)orig + g_offsetAccessFlags) & kAccAbstract;
+    if((g_sdkver>=Nougat_7_0 && g_sdkver<=Pie_9_0) || (g_sdkver>=AndroidQ_10_0 && !isAbstract))
+    {
+        //hotness_count_=0
+        *(unsigned short *)((char *)back + g_offsetHotnessCount) = 0;
+        *(unsigned short *)((char *)orig + g_offsetHotnessCount) = 0;
     }
     if(g_sdkver >= Oreo_8_0)
     {
@@ -322,19 +360,30 @@ BOOL CJavaHook::ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_ba
         *(unsigned *)((char *)back + g_offsetAccessFlags) |= kAccNative;
         *(unsigned *)((char *)orig + g_offsetAccessFlags) |= kAccNative;
     }
+    if(g_sdkver >= Oreo_8_1)
+    {
+        *(unsigned *)((char *)back + g_offsetAccessFlags) |= kAccPreviouslyWarm;
+        *(unsigned *)((char *)orig + g_offsetAccessFlags) |= kAccPreviouslyWarm;
+    }
     if(g_sdkver >= AndroidQ_10_0)
     {
         // On Android Q whether to use the fast path or not is cached in the ART method structure
         *(unsigned *)((char *)back + g_offsetAccessFlags) &= ~kAccFastInterpreterToInterpreterInvoke;
         *(unsigned *)((char *)orig + g_offsetAccessFlags) &= ~kAccFastInterpreterToInterpreterInvoke;
     }
+    if(is_uninit)
+    {
+        //对于没有初始化完成的方法（方法未编译，JNI未注册好）必须设置跳板
+        const unsigned char *tramp_backup = CHookTrampoline::GetInstance()->CreateBackupTrampoline(orig, *(void **)((char *)orig + g_offsetCompiledCode));
+        *(unsigned *)((char *)back + g_offsetCompiledCode) = (unsigned)tramp_backup;
+    }
     if(g_sdkver <= Marshmallow_6_0)
     {
         //7.0及以后的版本去掉了entry_point_from_interpreter_字段
-        //*(unsigned *)((char *)back + g_offsetInterpreterCode) = *(unsigned *)((char *)orig + g_offsetInterpreterCode);
+        *(unsigned *)((char *)back + g_offsetInterpreterCode) = *(unsigned *)((char *)orig + g_offsetInterpreterCode);
         *(unsigned *)((char *)orig + g_offsetInterpreterCode) = *(unsigned *)((char *)hook + g_offsetInterpreterCode);
     }
-    //*(unsigned *)((char *)back + g_offsetCompiledCode) = (unsigned)tramp_backup;//设置跳板并不能修复任何问题，反而会引起问题，这里先注释掉
+    const unsigned char *tramp_origin = CHookTrampoline::GetInstance()->CreateOriginTrampoline(hook, (unsigned char)g_offsetCompiledCode);
     *(unsigned *)((char *)orig + g_offsetCompiledCode) = (unsigned)tramp_origin;
 
     //确保备份方法为私有方法，修复如下异常：java.lang.IllegalArgumentException: Wrong number of arguments; expected 1, got 0
@@ -376,7 +425,18 @@ jobject CJavaHook::HookMethod(JNIEnv *env, jclass tweak_class, const char *tweak
     if(!backup.GetObj())
         return 0;
 
-    if(!ModifyMethod(env, tweak, backup, hook))
+    int is_uninit = 0;
+    void *entry_point_from_quick_compiled_code_ = *(void **)((char *)old_ + g_offsetCompiledCode);
+    if( entry_point_from_quick_compiled_code_==g_ArtQuickToInterpreterBridge ||
+        entry_point_from_quick_compiled_code_==g_ArtQuickGenericJniTrampoline)
+        is_uninit = 1; //方法未编译
+
+    unsigned is_native = *(unsigned *)((char *)old_ + g_offsetAccessFlags) & kAccNative;
+    void *entry_point_from_jni_ = *(void **)((char *)old_ + g_offsetJniCode);
+    if(is_native && entry_point_from_jni_==g_ArtJniDlsymLookupStub)
+        is_uninit = 1; //JNI 未注册
+
+    if(!ModifyMethod(env, tweak, backup, hook, is_uninit))
         return 0;
 
     return backup.Detach();

@@ -46,32 +46,35 @@
 #define OFFSET_REPLACEMENT_COMPILED_CODE    44
 #elif __ANDROID_API_VER__ == Marshmallow_6_0
 #define OFFSET_REPLACEMENT_ACCESS_FLAGS     12
-#define OFFSET_REPLACEMENT_INTERPRETER_CODE 28
+#define OFFSET_REPLACEMENT_INTERPRETER_CODE 28 //6.0以后的版本去掉了entry_point_from_interpreter_字段,此宏也被移除
 #define OFFSET_REPLACEMENT_JNI_CODE         32
 #define OFFSET_REPLACEMENT_COMPILED_CODE    36
 #elif __ANDROID_API_VER__ == Nougat_7_0
 #define OFFSET_REPLACEMENT_ACCESS_FLAGS     4
-#define OFFSET_REPLACEMENT_INTERPRETER_CODE 0 //7.0及以后的版本去掉了entry_point_from_interpreter_字段
 #define OFFSET_REPLACEMENT_JNI_CODE         28
 #define OFFSET_REPLACEMENT_COMPILED_CODE    32
 #elif __ANDROID_API_VER__ == Nougat_7_1
 #define OFFSET_REPLACEMENT_ACCESS_FLAGS     4
-#define OFFSET_REPLACEMENT_INTERPRETER_CODE 0 //7.0及以后的版本去掉了entry_point_from_interpreter_字段
 #define OFFSET_REPLACEMENT_JNI_CODE         28
 #define OFFSET_REPLACEMENT_COMPILED_CODE    32
 #elif __ANDROID_API_VER__ == Oreo_8_0
 #define OFFSET_REPLACEMENT_ACCESS_FLAGS     4
-#define OFFSET_REPLACEMENT_INTERPRETER_CODE 0 //7.0及以后的版本去掉了entry_point_from_interpreter_字段
 #define OFFSET_REPLACEMENT_JNI_CODE         24
 #define OFFSET_REPLACEMENT_COMPILED_CODE    28
 #elif __ANDROID_API_VER__ == Oreo_8_1
 #define OFFSET_REPLACEMENT_ACCESS_FLAGS     4
-#define OFFSET_REPLACEMENT_INTERPRETER_CODE 0 //7.0及以后的版本去掉了entry_point_from_interpreter_字段
 #define OFFSET_REPLACEMENT_JNI_CODE         24
 #define OFFSET_REPLACEMENT_COMPILED_CODE    28
 #elif __ANDROID_API_VER__ == Pie_9_0
 #define OFFSET_REPLACEMENT_ACCESS_FLAGS     4
-#define OFFSET_REPLACEMENT_INTERPRETER_CODE 0 //7.0及以后的版本去掉了entry_point_from_interpreter_字段
+#define OFFSET_REPLACEMENT_JNI_CODE         20
+#define OFFSET_REPLACEMENT_COMPILED_CODE    24
+#elif __ANDROID_API_VER__ == AndroidQ_10_0
+#define OFFSET_REPLACEMENT_ACCESS_FLAGS     4
+#define OFFSET_REPLACEMENT_JNI_CODE         20
+#define OFFSET_REPLACEMENT_COMPILED_CODE    24
+#elif __ANDROID_API_VER__ == AndroidR_11_0
+#define OFFSET_REPLACEMENT_ACCESS_FLAGS     4
 #define OFFSET_REPLACEMENT_JNI_CODE         20
 #define OFFSET_REPLACEMENT_COMPILED_CODE    24
 #endif
@@ -80,13 +83,15 @@
 #define kAccPrivate                         0x00000002 // field, method, ic
 #define kAccProtected                       0x00000004 // field, method, ic
 #define kAccNative                          0x00000100 // method
+#define kAccAbstract                        0x00000400 // class, method, ic
 #define kAccTweakHookedMethod               0x00008000 // Set for a method that has been hooked by tweaker.
-#define kAccFastInterpreterToInterpreterInvoke 0x40000000 //10.0
+#define kAccFastInterpreterToInterpreterInvoke 0x40000000 // >=10.0 Non-intrinsics: Caches whether we can use fast-path in the interpreter invokes.
 #if __ANDROID_API_VER__ >= Nougat_7_0 && __ANDROID_API_VER__ <= Oreo_8_0
 #define kAccCompileDontBother               0x01000000 // Set by the verifier for a method we do not want the compiler to compile.(7.0 7.1 8.0)
 #elif __ANDROID_API_VER__ >= Oreo_8_1
 #define kAccCompileDontBother               0x02000000 // Set by the verifier for a method we do not want the compiler to compile.(>=8.1)
 #endif
+#define kAccPreviouslyWarm                  0x00800000 // >=8.1 Set by the JIT when clearing profiling infos to denote that a method was previously warm.
 
 #define HOOK_COMPILED_CODE_OFFSET       4
 #define HOOK_ART_METHOD_ADDRESS         (HOOK_COMPILED_CODE_OFFSET+sizeof(void *))
