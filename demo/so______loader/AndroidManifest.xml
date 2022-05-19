@@ -5,14 +5,215 @@
     android:versionName="1.0" >
 
     <uses-sdk
-        android:minSdkVersion="19"
-        android:targetSdkVersion="23" />
+        android:minSdkVersion="24"
+        android:targetSdkVersion="24" />
+ 
+<uses-permission android:name="android.permission.INTERNET" /> 
+<!--允许程序打开网络套接字-->
 
-<uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" /> 
+<uses-permission android:name="android.permission.CALL_PHONE" /> 
+<!--允许程序访问有关GSM网络信息-->
 
+<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" /> 
+<!--允许程序访问Wi-Fi网络状态信息-->
+
+<uses-permission android:name="com.MobileTicket.permission.C2D_MESSAGE" /> 
+<uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" /> 
+
+<uses-permission android:name="android.permission.WAKE_LOCK" /> 
+<!--允许使用PowerManager的 WakeLocks保持进程在休眠时从屏幕消失-->
+
+<uses-permission android:name="android.permission.GET_ACCOUNTS" /> 
+<!--访问一个帐户列表在Accounts Service中-->
+<uses-permission android:name="android.permission.USE_CREDENTIALS" /> 
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" /> 
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" /> 
+<uses-permission android:name="android.permission.READ_PHONE_STATE" /> 
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" /> 
+<!--允许一个程序访问CellID或WiFi热点来获取粗略的位置-->
+
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" /> 
+<!--允许一个程序访问精良位置(如GPS)-->
+
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" /> 
+<!--允许一个程序接收到 ACTION_BOOT_COMPLETED广播在系统完成启动-->
+
+<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" /> 
+<!--允许一个程序打开窗口使用 TYPE_SYSTEM_ALERT，显示在其他所有程序的顶层-->
+
+<uses-permission android:name="android.permission.SYSTEM_OVERLAY_WINDOW" /> 
+
+<uses-permission android:name="android.permission.VIBRATE" /> 
+<!--允许访问振动设备-->
+
+
+<uses-permission android:name="android.permission.EXPAND_STATUS_BAR" /> 
+<!--允许一个程序扩展收缩在状态栏,<uses-permission android:name="android开发网提示应该是一个类似Windows Mobile中的托盘程序-->
+
+<uses-permission android:name="android.permission.FLASHLIGHT" /> 
+<!--访问闪光灯,<uses-permission android:name="android开发网提示HTC Dream不包含闪光灯-->
+
+<uses-permission android:name="android.permission.FOTA_UPDATE" /> 
+<!--暂时不了解这是做什么使用的，<uses-permission android:name="android开发网分析可能是一个预留权限.-->
+
+<uses-permission android:name="android.permission.GET_PACKAGE_SIZE" /> 
+<!--允许一个程序获取任何package占用空间容量-->
+
+<uses-permission android:name="android.permission.GET_TASKS" /> 
+<!--允许一个程序获取信息有关当前或最近运行的任务，一个缩略的任务状态，是否活动等等-->
+
+<uses-permission android:name="android.permission.WRITE_CONTACTS" /> 
+<!--允许程序写入但不读取用户联系人数据-->
+
+<uses-permission android:name="android.permission.WRITE_OWNER_DATA" /> 
+<!--允许一个程序写入但不读取所有者数据-->
+
+<uses-permission android:name="android.permission.WRITE_SETTINGS" /> 
+<!--允许程序读取或写入系统设置-->
+
+<uses-permission android:name="android.permission.WRITE_SMS" /> 
+<!--允许程序写短信-->
+
+<uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" /> 
+<!--允许程序写入同步设置-->
+
+<uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS" /> 
+<!--允许应用程序访问额外的位置提供命令-->
+
+<uses-permission android:name="android.permission.ACCESS_MOCK_LOCATION" /> 
+<!--允许程序创建模拟位置提供用于测试-->
+
+<uses-permission android:name="android.permission.ADD_SYSTEM_SERVICE" /> 
+<!--允许程序发布系统级服务-->
+
+<uses-permission android:name="android.permission.BATTERY_STATS" /> 
+<!--允许程序更新手机电池统计信息-->
+
+<uses-permission android:name="android.permission.BLUETOOTH" /> 
+<!--允许程序连接到已配对的蓝牙设备-->
+
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" /> 
+<!--允许程序发现和配对蓝牙设备-->
+
+<uses-permission android:name="android.permission.BROADCAST_STICKY" /> 
+<!--允许一个程序广播常用intents-->
+
+<uses-permission android:name="android.permission.CALL_PHONE" /> 
+<!--允许一个程序初始化一个电话拨号不需通过拨号用户界面需要用户确认-->
+
+<uses-permission android:name="android.permission.DISABLE_KEYGUARD" /> 
+<!--允许程序禁用键盘锁-->
+
+<uses-permission android:name="android.permission.CAMERA" /> 
+<!--请求访问使用照相设备-->
+
+<uses-permission android:name="android.permission.CHANGE_CONFIGURATION" /> 
+<!--允许一个程序修改当前设置，如本地化-->
+
+<uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" /> 
+<!--允许程序改变网络连接状态-->
+
+<uses-permission android:name="android.permission.CHANGE_WIFI_STATE" /> 
+<!--允许程序改变Wi-Fi连接状态-->
+
+<uses-permission android:name="android.permission.CLEAR_APP_CACHE" /> 
+<!--允许一个程序清楚缓存从所有安装的程序在设备中-->
+
+<uses-permission android:name="android.permission.RECEIVE_MMS" /> 
+<!--允许一个程序监控将收到MMS彩信,记录或处理-->
+
+<uses-permission android:name="android.permission.RECEIVE_SMS" /> 
+<!--允许程序监控一个将收到短信息，记录或处理-->
+
+<uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" /> 
+<!--允许程序监控将收到WAP PUSH信息-->
+
+<uses-permission android:name="android.permission.RECORD_AUDIO" /> 
+<!--允许程序录制音频-->
+
+<uses-permission android:name="android.permission.REORDER_TASKS" /> 
+<!--允许程序改变Z轴排列任务-->
+
+<uses-permission android:name="android.permission.RESTART_PACKAGES" /> 
+<!--允许程序重新启动其他程序-->
+
+<uses-permission android:name="android.permission.SEND_SMS" /> 
+<!--允许程序发送SMS短信-->
+
+<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" /> 
+<!--允许程序修改全局音频设置-->
+
+<uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS" /> 
+<!--允许挂载和反挂载文件系统可移动存储-->
+
+<uses-permission android:name="android.permission.PERSISTENT_ACTIVITY" /> 
+<!--允许一个程序设置他的activities显示-->
+
+<uses-permission android:name="android.permission.PROCESS_OUTGOING_CALLS" /> 
+<!--允许程序监视、修改有关播出电话-->
+
+<uses-permission android:name="android.permission.READ_CALENDAR" /> 
+<!--允许程序读取用户日历数据-->
+
+<uses-permission android:name="android.permission.READ_CONTACTS" /> 
+<!--允许程序读取用户联系人数据-->
+
+<uses-permission android:name="android.permission.READ_LOGS" /> 
+<!--允许程序读取底层系统日志文件-->
+
+<uses-permission android:name="android.permission.READ_OWNER_DATA" /> 
+<!--允许程序读取所有者数据-->
+
+<uses-permission android:name="android.permission.READ_SMS" /> 
+<!--允许程序读取短信息-->
+
+<uses-permission android:name="android.permission.READ_SYNC_SETTINGS" /> 
+<!--允许程序读取同步设置-->
+
+<uses-permission android:name="android.permission.READ_SYNC_STATS" /> 
+<!--允许程序读取同步状态-->
+
+<uses-permission android:name="android.permission.SET_ALWAYS_FINISH" /> 
+<!--允许程序控制是否活动间接完成在处于后台时-->
+
+<uses-permission android:name="android.permission.SET_ANIMATION_SCALE" /> 
+<!--修改全局信息比例-->
+
+<uses-permission android:name="android.permission.SET_DEBUG_APP" /> 
+<!--配置一个程序用于调试-->
+
+<uses-permission android:name="android.permission.SET_PROCESS_FOREGROUND" /> 
+<!--允许程序当前运行程序强行到前台-->
+
+<uses-permission android:name="android.permission.SET_PROCESS_LIMIT" /> 
+<!--允许设置最大的运行进程数量-->
+
+<uses-permission android:name="android.permission.SET_TIME_ZONE" /> 
+<!--允许程序设置时间区域-->
+
+<uses-permission android:name="android.permission.SET_WALLPAPER" /> 
+<!--允许程序设置壁纸-->
+
+<uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" /> 
+<!--允许程序设置壁纸hits-->
+
+<uses-permission android:name="android.permission.SIGNAL_PERSISTENT_PROCESSES" /> 
+<!--允许程序请求发送信号到所有显示的进程中-->
+
+<uses-permission android:name="android.permission.SUBSCRIBED_FEEDS_READ" /> 
+<!--允许一个程序访问订阅RSS Feed内容提供-->
+
+<uses-permission android:name="android.permission.SUBSCRIBED_FEEDS_WRITE" /> 
+<!--系统暂时保留改设置,<uses-permission android:name="android开发网认为未来版本会加入该功能。-->
+
+<uses-permission android:name="android.permission.WRITE_CALENDAR" /> 
+<!--允许一个程序写入但不读取用户日历数据-->
+<!--android:name="com.android.guobao.liao.apptweak.TweakTest"-->
     <application
         android:name=".LoaderApp"
         android:allowBackup="true"
+        android:debuggable="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppTheme" >

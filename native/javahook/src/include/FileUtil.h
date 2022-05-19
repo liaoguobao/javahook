@@ -239,6 +239,21 @@ public:
         }while(1);
         return FALSE; //永远不会进到这里
     }
+
+    static BOOL CopyFile(const char *src_file, const char *des_file)
+    {
+        string bindata;
+        BOOL br = ReadBinDataFromFile(src_file, bindata);
+        BOOL bw = WriteBinDataToFile(des_file, bindata.c_str(), (int)bindata.size());
+        return br&&bw;
+    }
+
+    static BOOL MoveFile(const char *src_file, const char *des_file)
+    {
+        BOOL b = CopyFile(src_file, des_file);
+        b = (b ? !remove(src_file) : b);
+        return b;
+    }
 };
 
 #endif

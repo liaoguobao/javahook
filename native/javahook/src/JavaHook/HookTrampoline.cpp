@@ -13,12 +13,12 @@ CHookTrampoline::CHookTrampoline()
 {
     backup = 0;
     origin = 0;
-    code = (unsigned char *)mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_PRIVATE, -1, 0);
+    code = (unsigned char *)mmap(0, HOOK_PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_PRIVATE, -1, 0);
 }
 
 CHookTrampoline::~CHookTrampoline()
 {
-    munmap(code, PAGE_SIZE);
+    munmap(code, HOOK_PAGE_SIZE);
 }
 
 CHookTrampoline * CHookTrampoline::GetInstance()
@@ -32,16 +32,20 @@ const unsigned char * CHookTrampoline::CreateOriginTrampoline(void *hook_art_met
     if(!hook_art_method || !code || origin>=MAX_REPLACE_TRAMPOLINE_INDEX)
         return 0;
 
-    mprotect(code, PAGE_SIZE, PROT_READ|PROT_EXEC|PROT_WRITE);
+    mprotect(code, HOOK_PAGE_SIZE, PROT_READ|PROT_EXEC|PROT_WRITE);
 
     unsigned char *codeaddr = code + origin*REPLACE_TRAMPOLINE_SIZE;
     memcpy(codeaddr, (void *)replacement_origin_trampoline, ORIGIN_REPLACE_TRAMPOLINE_SIZE);
 
     *(void **)&codeaddr[HOOK_ART_METHOD_ADDRESS] = hook_art_method;
-    *(unsigned char *)&codeaddr[HOOK_COMPILED_CODE_OFFSET] = offset_compiled_code;
-
-    mprotect(code, PAGE_SIZE, PROT_READ|PROT_EXEC);
-    __clear_cache(code, code+PAGE_SIZE);
+#if defined(__arm__)
+    *(unsigned char *)&codeaddr[HOOK_COMPILED_CODE_OFFSET+0] |= offset_compiled_code;
+#elif defined(__aarch64__)
+    *(unsigned char *)&codeaddr[HOOK_COMPILED_CODE_OFFSET+0] |= offset_compiled_code << 4;
+    *(unsigned char *)&codeaddr[HOOK_COMPILED_CODE_OFFSET+1] |= offset_compiled_code >> 4;
+#endif
+    mprotect(code, HOOK_PAGE_SIZE, PROT_READ|PROT_EXEC);
+    __clear_cache(code, code+HOOK_PAGE_SIZE);
 
     origin++;
     return codeaddr;
@@ -52,7 +56,7 @@ const unsigned char * CHookTrampoline::CreateBackupTrampoline(void *orig_art_met
     if(!orig_art_method || !code || backup>=MAX_REPLACE_TRAMPOLINE_INDEX)
         return 0;
 
-    mprotect(code, PAGE_SIZE, PROT_READ|PROT_EXEC|PROT_WRITE);
+    mprotect(code, HOOK_PAGE_SIZE, PROT_READ|PROT_EXEC|PROT_WRITE);
 
     unsigned char *codeaddr = code + backup*REPLACE_TRAMPOLINE_SIZE + ORIGIN_REPLACE_TRAMPOLINE_SIZE;
     memcpy(codeaddr, (void *)replacement_backup_trampoline, BACKUP_REPLACE_TRAMPOLINE_SIZE);
@@ -60,8 +64,8 @@ const unsigned char * CHookTrampoline::CreateBackupTrampoline(void *orig_art_met
     *(void **)&codeaddr[ORIG_ART_METHOD_ADDRESS] = orig_art_method;
     *(void **)&codeaddr[ORIG_COMPILED_CODE_ADDRESS] = orig_compiled_code;
 
-    mprotect(code, PAGE_SIZE, PROT_READ|PROT_EXEC);
-    __clear_cache(code, code+PAGE_SIZE);
+    mprotect(code, HOOK_PAGE_SIZE, PROT_READ|PROT_EXEC);
+    __clear_cache(code, code+HOOK_PAGE_SIZE);
 
     backup++;
     return codeaddr;

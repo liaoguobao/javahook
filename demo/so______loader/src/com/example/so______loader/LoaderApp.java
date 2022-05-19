@@ -7,6 +7,5 @@ public class LoaderApp extends Application {
     @Override
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
-    	System.loadLibrary("javahook");
     }
 }

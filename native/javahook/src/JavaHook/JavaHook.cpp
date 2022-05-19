@@ -1,14 +1,15 @@
 //JavaHook.cpp
 
 #include "JavaHook.h"
+#include "HookHelper.h"
 #include "HookTrampoline.h"
 #include "hook_trampoline_arm.h"
 #include "../include/JniUtil.h"
 #include "../include/LinkerUtil.h"
 //#include "../include/DebugUtil.h"
 
-static const char*  g_sdkverStr[] = {"KitKat_4_4", "KitKat_4_4W", "Lollipop_5_0", "Lollipop_5_1", "Marshmallow_6_0", "Nougat_7_0", "Nougat_7_1", "Oreo_8_0", "Oreo_8_1", "Pie_9_0", "AndroidQ_10_0", "AndroidR_11_0"};
-static void*        (*ART_Runtime_CreateResolutionMethod)(void* thiz) = 0; //ArtMethod* Runtime::CreateResolutionMethod();
+static const char*  g_sdkverStr[] = {"Lollipop_5_0", "Lollipop_5_1", "Marshmallow_6_0", "Nougat_7_0", "Nougat_7_1", "Oreo_8_0", "Oreo_8_1", "Pie_9_0", "AndroidQ_10_0", "AndroidR_11_0", "AndroidS_12_0"};
+static void*        (*Runtime_CreateResolutionMethod)(void* thiz) = 0; //ArtMethod* Runtime::CreateResolutionMethod();
 static void*        g_runtime = 0;
 static void*        g_ArtQuickToInterpreterBridge = 0;
 static void*        g_ArtQuickGenericJniTrampoline = 0;
@@ -32,6 +33,7 @@ CJavaHook::~CJavaHook()
 
 BOOL CJavaHook::InitJavaHook(JavaVM *vm)
 {
+    CHookHelper::InitHookHelper();
     if(!g_sdkver)
     {
         g_sdkver = CJniUtil::GetAndroidSdkVer();
@@ -44,6 +46,27 @@ BOOL CJavaHook::InitJavaHook(JavaVM *vm)
     {
         vm = CJniUtil::GetJavaVM();
     }
+    if(!g_runtime)
+    {
+        g_runtime = *(void **)(vm + 1);
+    }
+    string vmso = CJniUtil::GetAndroidVmDir() + string("libart.so"); //这里必须要指定绝对路径,因为有可能会找到/system/fake-libs64/libart.so
+    if(!Runtime_CreateResolutionMethod)
+    {
+        *(void **)&Runtime_CreateResolutionMethod = CLinkerUtil::dlsym(vmso.c_str(), "_ZN3art7Runtime22CreateResolutionMethodEv");
+    }
+    if(!g_ArtQuickToInterpreterBridge)
+    {
+        g_ArtQuickToInterpreterBridge = CLinkerUtil::elfsym(vmso.c_str(), "art_quick_to_interpreter_bridge");
+    }
+    if(!g_ArtQuickGenericJniTrampoline)
+    {
+        g_ArtQuickGenericJniTrampoline = CLinkerUtil::elfsym(vmso.c_str(), "art_quick_generic_jni_trampoline");
+    }
+    if(!g_ArtJniDlsymLookupStub)
+    {
+        g_ArtJniDlsymLookupStub = CLinkerUtil::elfsym(vmso.c_str(), "art_jni_dlsym_lookup_stub");
+    }
     if(!g_sizeofArtMethod)
     {
         CJniEnv env(vm);
@@ -53,28 +76,7 @@ BOOL CJavaHook::InitJavaHook(JavaVM *vm)
         jmethodID mid1 = env->FromReflectedMethod(obj1);
         jmethodID mid2 = env->FromReflectedMethod(obj2);
 
-        g_sizeofArtMethod = (unsigned)mid2 - (unsigned)mid1;
-    }
-    if(!g_runtime)
-    {
-        g_runtime = *(void **)(vm + 1);
-    }
-    if(!ART_Runtime_CreateResolutionMethod)
-    {
-        //ART_Runtime_CreateResolutionMethod函数所有版本虚拟机都会导出，且接口参数一致
-        *(void **)&ART_Runtime_CreateResolutionMethod = CLinkerUtil::dlsym("libart.so", "_ZN3art7Runtime22CreateResolutionMethodEv");
-    }
-    if(!g_ArtQuickToInterpreterBridge)
-    {
-        *(void **)&g_ArtQuickToInterpreterBridge = CLinkerUtil::elfsym("libart.so", "art_quick_to_interpreter_bridge");
-    }
-    if(!g_ArtQuickGenericJniTrampoline)
-    {
-        *(void **)&g_ArtQuickGenericJniTrampoline = CLinkerUtil::elfsym("libart.so", "art_quick_generic_jni_trampoline");
-    }
-    if(!g_ArtJniDlsymLookupStub)
-    {
-        *(void **)&g_ArtJniDlsymLookupStub = CLinkerUtil::elfsym("libart.so", "art_jni_dlsym_lookup_stub");
+        g_sizeofArtMethod = (unsigned)((size_t)mid2 - (size_t)mid1);
     }
     if(!g_offsetCompiledCode)
     {
@@ -124,9 +126,9 @@ BOOL CJavaHook::InitJavaHook(JavaVM *vm)
         if(g_sdkver <= Lollipop_5_1)
         {
             //5.0 5.1 系统中Method中只有artMethod一个字段，并且artMethod对象在JAVA层是透明的
-            toStringMethod.Attach(env, CJniUtil::GetObjectField(env, toStringMethod, "artMethod", "Ljava/lang/reflect/ArtMethod;").l);
+            toStringMethod.Attach(env, CJniCall::GetObjectField(env, toStringMethod, "artMethod", "Ljava/lang/reflect/ArtMethod;").l);
         }
-        uint32_t accessFlags = CJniUtil::GetObjectField(env, toStringMethod, "accessFlags", "I").i;
+        uint32_t accessFlags = CJniCall::GetObjectField(env, toStringMethod, "accessFlags", "I").i;
 
         for(int i = 0; i < g_sizeofArtMethod/sizeof(uint32_t); ++i)
         {
@@ -146,7 +148,7 @@ BOOL CJavaHook::InitJavaHook(JavaVM *vm)
             CJniObj toStringMethod(env, FindClassMethod(env, "java.lang.Object", "toString()"));
 
             uint32_t* artMethod = (uint32_t *)env->FromReflectedMethod(toStringMethod);
-            uint32_t dexMethodIndex = CJniUtil::GetObjectField(env, toStringMethod, "dexMethodIndex", "I").i;
+            uint32_t dexMethodIndex = CJniCall::GetObjectField(env, toStringMethod, "dexMethodIndex", "I").i;
 
             for(int i = 0; i < g_sizeofArtMethod/sizeof(uint32_t); ++i)
             {
@@ -166,51 +168,64 @@ BOOL CJavaHook::InitJavaHook(JavaVM *vm)
     {
         g_kAccCompileDontBother = 0x02000000;
     }
-    //CDebugUtil::WriteToLogcat("sdkverStr=%s, runtime=%p, ArtQuickGenericJniTrampoline=%p, ArtQuickToInterpreterBridge=%p, ArtJniDlsymLookupStub=%p, CreateResolutionMethod=%p, sizeofArtMethod=%d, offsetAccessFlags=%d, offsetHotnessCount=%d, offsetInterpreterCode=%d, offsetJniCode=%d, offsetCompiledCode=%d\r\n", g_sdkverStr[g_sdkver-__ANDROID_API_MIN__], g_runtime, g_ArtQuickGenericJniTrampoline, g_ArtQuickToInterpreterBridge, g_ArtJniDlsymLookupStub, ART_Runtime_CreateResolutionMethod, g_sizeofArtMethod, g_offsetAccessFlags, g_offsetHotnessCount, g_offsetInterpreterCode, g_offsetJniCode, g_offsetCompiledCode);
+    //CDebugUtil::WriteToLogcat("sdkverStr=%s, runtime_=%p, ArtQuickGenericJniTrampoline=%p, ArtQuickToInterpreterBridge=%p, ArtJniDlsymLookupStub=%p, CreateResolutionMethod=%p, sizeofArtMethod=%d, offsetAccessFlags=%d, offsetHotnessCount=%d, offsetInterpreterCode=%d, offsetJniCode=%d, offsetCompiledCode=%d\r\n", g_sdkverStr[g_sdkver-__ANDROID_API_MIN__], g_runtime, g_ArtQuickGenericJniTrampoline, g_ArtQuickToInterpreterBridge, g_ArtJniDlsymLookupStub, Runtime_CreateResolutionMethod, g_sizeofArtMethod, g_offsetAccessFlags, g_offsetHotnessCount, g_offsetInterpreterCode, g_offsetJniCode, g_offsetCompiledCode);
     return TRUE;
 }
 
 jobject CJavaHook::FindClassMethod(JNIEnv *env, jclass clazz, const char *method)
 {
-    //method: doCommandNative(int,java.lang.Object[])
-    //method: doCommandNative
+    //method: doCommandNative(int,java.lang.Object[]) //通过完整声明查找非构造方法
+    //method: doCommandNative //通过名称查找非构造方法
+    //method: (java.lang.String) //通过完整声明查找构造方法
+    //method: (java.lang.String)java.util.List<java.lang.String> //通过方法签名查找非构造方法(应付那种函数名可能被混淆的方法)
     if(!env || !clazz)
         return 0;
     if(!method || !*method)
         return 0;
 
-    CJniObj arrObj(env, CJniUtil::CallObjectMethod(env, clazz, "getDeclaredMethods", "()[Ljava/lang/reflect/Method;").l);
+    size_t mlen = strlen(method);
+    int isname = !strchr(method, '('); //通过名称查找非构造方法
+    int isinit = (method[0]=='(' && method[mlen-1]==')'); //查找构造方法
+    int issign = (method[0]=='(' && method[mlen-1]!=')'); //通过方法签名查找非构造方法
+
+    CJniObj arrObj(env, !isinit?CJniCall::CallObjectMethod(env, clazz, "getDeclaredMethods", "()[Ljava/lang/reflect/Method;").l:CJniCall::CallObjectMethod(env, clazz, "getDeclaredConstructors", "()[Ljava/lang/reflect/Constructor;").l);
     if(!arrObj.GetObj())
         return 0;
 
-    size_t mlen = strlen(method);
-    jsize len = env->GetArrayLength(arrObj);
-    int isname = !strchr(method, '('); //支持只匹配方法名称，不匹配参数
+    string join = method;
+    if(!isname && !issign)
+    {
+        CJniObj jname(env, CJniCall::CallObjectMethod(env, clazz, "getName", "()Ljava/lang/String;").l);
 
+        join  = CJavaToBase(env, (jstring)jname.GetObj());
+        join += (isinit ? "" : ".");
+        join += method;
+    }
+
+    jsize len = env->GetArrayLength(arrObj);
     for(jsize i = 0; i < len; ++i)
     {
         CJniObj ele(env, env->GetObjectArrayElement(arrObj, i));
-        CJniObj strObj(env, CJniUtil::CallObjectMethod(env, ele, isname?"getName":"toString", "()Ljava/lang/String;").l);
+        CJniObj strObj(env, CJniCall::CallObjectMethod(env, ele, isname?"getName":(issign?"toGenericString":"toString"), "()Ljava/lang/String;").l);
 
-        const char *jv = env->GetStringUTFChars(strObj, 0);
-        string tostring = jv; //public static transient native java.lang.Object com.taobao.wireless.security.adapter.JNICLibrary.doCommandNative(int,java.lang.Object[]) throws org.json.JSONException
-        env->ReleaseStringUTFChars(strObj, jv);
-
-        if(!isname)
+        string decl(CJavaToBase(env, (jstring)strObj.GetObj())); //public static transient native java.lang.Object com.taobao.wireless.security.adapter.JNICLibrary.doCommandNative(int,java.lang.Object[]) throws org.json.JSONException
+        if(issign)
         {
-            string declared = tostring.substr(0, tostring.rfind(')')+1); //public static transient native java.lang.Object com.taobao.wireless.security.adapter.JNICLibrary.doCommandNative(int,java.lang.Object[])
-            if(declared.size()<=mlen || declared[declared.size()-mlen-1]!='.')
-                continue;
-            string method_ = declared.substr(declared.size() - mlen);
-            if(method_ != method)
-                continue;
+            decl = decl.substr(0, decl.rfind(')')+1); //public static transient native java.lang.Object com.taobao.wireless.security.adapter.JNICLibrary.doCommandNative(int,java.lang.Object[])
+            string ret = decl.substr(0, decl.rfind(' ')); //public static transient native java.lang.Object
+            ret = ret.substr(ret.rfind(' ')+1); //java.lang.Object
+            decl = decl.substr(decl.rfind('(')); //(int,java.lang.Object[])
+            decl += ret; //(int,java.lang.Object[])java.lang.Object
         }
-        else
+        else if(!isname)
         {
-            if(tostring != method)
-                continue;
+            decl = decl.substr(0, decl.rfind(')')+1); //public static transient native java.lang.Object com.taobao.wireless.security.adapter.JNICLibrary.doCommandNative(int,java.lang.Object[])
+            decl = decl.substr(decl.rfind(' ')+1); //com.taobao.wireless.security.adapter.JNICLibrary.doCommandNative(int,java.lang.Object[])
         }
-        return ele.Detach();
+        if(decl == join)
+        {
+            return ele.Detach();
+        }
     }
     return 0;
 }
@@ -241,17 +256,6 @@ jobject CJavaHook::BackupMethod(JNIEnv *env, jobject method)
     if(!env || !method)
         return 0;
 
-    if(FALSE)
-    {
-        //最简洁、全版本兼容的创建被份方法的代码，绕过JAVA层创建Method的各种限制，也不再依赖JavaTweakStub.java(8.0版本这种模式会有问题)
-        jmethodID orig = env->FromReflectedMethod(method);
-        jmethodID back = (jmethodID)ART_Runtime_CreateResolutionMethod(g_runtime);//创建ArtMethod
-        memcpy(back, orig, g_sizeofArtMethod);
-
-        CJniObj declaringClass(env, CJniUtil::CallObjectMethod(env, method, "getDeclaringClass", "()Ljava/lang/Class;").l);
-        jobject backupMethod = env->ToReflectedMethod(declaringClass, back, 0);//创建Method
-        return backupMethod;
-    }
     CJniObj backupMethod;
     if(g_sdkver <= Lollipop_5_1)//5.0\5.1
     {
@@ -264,59 +268,57 @@ jobject CJavaHook::BackupMethod(JNIEnv *env, jobject method)
         CJniObj artMethodClass(env, env->FindClass("java/lang/reflect/ArtMethod"));
         CJniObj methodClass(env, env->FindClass("java/lang/reflect/Method"));
 
-        CJniObj destArtMethodConstructor(env, CJniUtil::CallObjectMethod(env, artMethodClass, "getDeclaredConstructor", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;", 0).l);
+        CJniObj destArtMethodConstructor(env, CJniCall::CallObjectMethod(env, artMethodClass, "getDeclaredConstructor", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;", 0).l);
 
-        CJniUtil::CallObjectMethod(env, destArtMethodConstructor, "setAccessible", "(Z)V", 1);
-        CJniObj destArtMethod(env, CJniUtil::CallObjectMethod(env, destArtMethodConstructor, "newInstance", "([Ljava/lang/Object;)Ljava/lang/Object;", 0).l);
+        CJniCall::CallObjectMethod(env, destArtMethodConstructor, "setAccessible", "(Z)V", 1);
+        CJniObj destArtMethod(env, CJniCall::CallObjectMethod(env, destArtMethodConstructor, "newInstance", "([Ljava/lang/Object;)Ljava/lang/Object;", 0).l);
 
         CJniObj artMethodClass_(env, CJniUtil::NewObjectArray(env, "java/lang/Class", 1, artMethodClass.GetObj()));
-        CJniObj backupMethodConstructor(env, CJniUtil::CallObjectMethod(env, methodClass, "getConstructor", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;", artMethodClass_.GetObj()).l);
+        CJniObj backupMethodConstructor(env, CJniCall::CallObjectMethod(env, methodClass, "getConstructor", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;", artMethodClass_.GetObj()).l);
 
         CJniObj destArtMethod_(env, CJniUtil::NewObjectArray(env, "java/lang/Object", 1, destArtMethod.GetObj()));
-        backupMethod.Attach(env, CJniUtil::CallObjectMethod(env, backupMethodConstructor, "newInstance", "([Ljava/lang/Object;)Ljava/lang/Object;", destArtMethod_.GetObj()).l);
+        backupMethod.Attach(env, CJniCall::CallObjectMethod(env, backupMethodConstructor, "newInstance", "([Ljava/lang/Object;)Ljava/lang/Object;", destArtMethod_.GetObj()).l);
     }
-    else if(g_sdkver == Marshmallow_6_0)//6.0
+    else if(g_sdkver >= Marshmallow_6_0)//6.0
     {
         //Constructor<Method> constructor = Method.class.getDeclaredConstructor();
-        //AccessibleObject.setAccessible(new AccessibleObject[]{constructor}, true);
+        //Field override = AccessibleObject.class.getDeclaredField(Build.VERSION.SDK_INT == Build.VERSION_CODES.M ? "flag" : "override");
+        //override.setAccessible(true);
+        //override.setBoolean(constructor, true);
         //Method newMethod = constructor.newInstance();
 
         CJniObj methodClass(env, env->FindClass("java/lang/reflect/Method"));
-        CJniObj destMethodConstructor(env, CJniUtil::CallObjectMethod(env, methodClass, "getDeclaredConstructor", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;", 0).l);
+        CJniObj destMethodConstructor(env, CJniCall::CallObjectMethod(env, methodClass, "getDeclaredConstructor", "([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;", 0).l);
 
-        CJniObj accObj(env, CJniUtil::NewObjectArray(env, "java/lang/reflect/AccessibleObject", 1, destMethodConstructor.GetObj()));
-        CJniUtil::CallClassMethod(env, "java/lang/reflect/AccessibleObject", "setAccessible", "([Ljava/lang/reflect/AccessibleObject;Z)V", accObj.GetObj(), 1);
+        CJniObj accClass(env, env->FindClass("java/lang/reflect/AccessibleObject"));
+        CJniObj overrideField(env, CJniCall::CallObjectMethod(env, accClass, "getDeclaredField", "(Ljava/lang/String;)Ljava/lang/reflect/Field;", CBaseToJava(env, g_sdkver==Marshmallow_6_0?"flag":"override").GetObject()).l);
 
-        backupMethod.Attach(env, CJniUtil::CallObjectMethod(env, destMethodConstructor, "newInstance", "([Ljava/lang/Object;)Ljava/lang/Object;", 0).l);
+        CJniCall::CallObjectMethod(env, overrideField, "setAccessible", "(Z)V", 1);
+        CJniCall::CallObjectMethod(env, overrideField, "setBoolean", "(Ljava/lang/Object;Z)V", destMethodConstructor.GetObj(), 1);
+
+        backupMethod.Attach(env, CJniCall::CallObjectMethod(env, destMethodConstructor, "newInstance", "([Ljava/lang/Object;)Ljava/lang/Object;", 0).l);
 
         jvalue artMethod;
-        artMethod.j = (jlong)ART_Runtime_CreateResolutionMethod(g_runtime);//新创建的方法artMethod字段是空的，这里要创建ArtMethod，给artMethod字段赋值
-        CJniUtil::SetObjectField(env, backupMethod.GetObj(), "artMethod", "J", artMethod);
-    }
-    else
-    {
-        //Constructor<Method> constructor = Method.class.getDeclaredConstructor();
-        //AccessibleObject.setAccessible(new AccessibleObject[]{constructor}, true);这句调用在7.0上会抛出异常，无法构造方法对象
-        backupMethod.Attach(env, CJniUtil::CallClassMethod(env, "com/android/guobao/liao/apptweak/JavaTweakStub", "getStubMethod", "()Ljava/lang/reflect/Method;").l);
+        artMethod.j = (jlong)Runtime_CreateResolutionMethod(g_runtime);//新创建的方法artMethod字段是空的，这里要创建ArtMethod，给artMethod字段赋值
+        CJniCall::SetObjectField(env, backupMethod.GetObj(), "artMethod", "J", artMethod);
     }
     CJniObj abstractMethodClass(env, env->FindClass(g_sdkver<=Nougat_7_1?"java/lang/reflect/AbstractMethod":"java/lang/reflect/Executable"));
-    CJniObj methodFields(env, CJniUtil::CallObjectMethod(env, abstractMethodClass, "getDeclaredFields", "()[Ljava/lang/reflect/Field;").l);
+    CJniObj methodFields(env, CJniCall::CallObjectMethod(env, abstractMethodClass, "getDeclaredFields", "()[Ljava/lang/reflect/Field;").l);
 
     jsize len = env->GetArrayLength(methodFields);
     for(jsize i = 0; i < len; ++i)
     {
         CJniObj methodField(env, env->GetObjectArrayElement(methodFields, i));
+        CJniObj fieldName(env, CJniCall::CallObjectMethod(env, methodField, "getName", "()Ljava/lang/String;").l);
 
-        CJniObj fieldName(env, CJniUtil::CallObjectMethod(env, methodField, "getName", "()Ljava/lang/String;").l);
-        CJavaToBase _fieldName(env, (jstring)fieldName.GetObj());
-        if(!strcmp((char *)_fieldName.GetValue(), "artMethod"))
+        if(!strcmp(CJavaToBase(env, (jstring)fieldName.GetObj()), "artMethod"))
         {
             //artMethod字段的值就是ArtMethod*,后续会调用memcpy(back, orig, g_sizeofArtMethod)，所以这里指针不需要替换
             continue;
         }
-        CJniUtil::CallObjectMethod(env, methodField, "setAccessible", "(Z)V", 1);
-        CJniObj fieldValue(env, CJniUtil::CallObjectMethod(env, methodField, "get", "(Ljava/lang/Object;)Ljava/lang/Object;", method).l);
-        CJniUtil::CallObjectMethod(env, methodField, "set", "(Ljava/lang/Object;Ljava/lang/Object;)V", backupMethod.GetObj(), fieldValue.GetObj());
+        CJniCall::CallObjectMethod(env, methodField, "setAccessible", "(Z)V", 1);
+        CJniObj fieldValue(env, CJniCall::CallObjectMethod(env, methodField, "get", "(Ljava/lang/Object;)Ljava/lang/Object;", method).l);
+        CJniCall::CallObjectMethod(env, methodField, "set", "(Ljava/lang/Object;Ljava/lang/Object;)V", backupMethod.GetObj(), fieldValue.GetObj());
     }
 
     //下面这段是将原方法的ArtMethod结构体字段完全拷贝到备份方法中，使得备份方法和原方法完全一致
@@ -333,7 +335,7 @@ BOOL CJavaHook::ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_ba
         return FALSE;
 
     //设置备份方法可被正常调用，因为原始方法可能是私有或保护方法，外部不能直接调用
-    CJniUtil::CallObjectMethod(env, method_back, "setAccessible", "(Z)V", 1);
+    CJniCall::CallObjectMethod(env, method_back, "setAccessible", "(Z)V", 1);
 
     jmethodID orig = env->FromReflectedMethod(method_orig);
     jmethodID back = env->FromReflectedMethod(method_back);
@@ -357,7 +359,7 @@ BOOL CJavaHook::ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_ba
     if(g_sdkver >= Oreo_8_0)
     {
         // set the target method to native so that Android O wouldn't invoke it with interpreter
-        *(unsigned *)((char *)back + g_offsetAccessFlags) |= kAccNative;
+        //*(unsigned *)((char *)back + g_offsetAccessFlags) |= kAccNative; //备份方法不需要添加kAccNative标记，否则会导致某些方法hook后崩溃
         *(unsigned *)((char *)orig + g_offsetAccessFlags) |= kAccNative;
     }
     if(g_sdkver >= Oreo_8_1)
@@ -375,16 +377,16 @@ BOOL CJavaHook::ModifyMethod(JNIEnv *env, jobject method_orig, jobject method_ba
     {
         //对于没有初始化完成的方法（方法未编译，JNI未注册好）必须设置跳板
         const unsigned char *tramp_backup = CHookTrampoline::GetInstance()->CreateBackupTrampoline(orig, *(void **)((char *)orig + g_offsetCompiledCode));
-        *(unsigned *)((char *)back + g_offsetCompiledCode) = (unsigned)tramp_backup;
+        *(size_t *)((char *)back + g_offsetCompiledCode) = (size_t)tramp_backup;
     }
     if(g_sdkver <= Marshmallow_6_0)
     {
         //7.0及以后的版本去掉了entry_point_from_interpreter_字段
-        *(unsigned *)((char *)back + g_offsetInterpreterCode) = *(unsigned *)((char *)orig + g_offsetInterpreterCode);
-        *(unsigned *)((char *)orig + g_offsetInterpreterCode) = *(unsigned *)((char *)hook + g_offsetInterpreterCode);
+        *(size_t *)((char *)back + g_offsetInterpreterCode) = *(size_t *)((char *)orig + g_offsetInterpreterCode);
+        *(size_t *)((char *)orig + g_offsetInterpreterCode) = *(size_t *)((char *)hook + g_offsetInterpreterCode);
     }
     const unsigned char *tramp_origin = CHookTrampoline::GetInstance()->CreateOriginTrampoline(hook, (unsigned char)g_offsetCompiledCode);
-    *(unsigned *)((char *)orig + g_offsetCompiledCode) = (unsigned)tramp_origin;
+    *(size_t *)((char *)orig + g_offsetCompiledCode) = (size_t)tramp_origin;
 
     //确保备份方法为私有方法，修复如下异常：java.lang.IllegalArgumentException: Wrong number of arguments; expected 1, got 0
     *(unsigned *)((char *)back + g_offsetAccessFlags) &= ~(kAccPublic | kAccProtected);//~(ACC_PUBLIC | ACC_PROTECTED)
@@ -436,6 +438,7 @@ jobject CJavaHook::HookMethod(JNIEnv *env, jclass tweak_class, const char *tweak
     if(is_native && entry_point_from_jni_==g_ArtJniDlsymLookupStub)
         is_uninit = 1; //JNI 未注册
 
+    //CDebugUtil::WriteToLogcat("init=%d, native=%d, ArtQuickToInterpreterBridge=%p, entry_point_from_quick_compiled_code_=%p, ArtQuickGenericJniTrampoline=%p, entry_point_from_jni_=%p, ArtJniDlsymLookupStub=%p\r\n", !is_uninit, !!is_native, g_ArtQuickToInterpreterBridge, entry_point_from_quick_compiled_code_, g_ArtQuickGenericJniTrampoline, entry_point_from_jni_, g_ArtJniDlsymLookupStub);
     if(!ModifyMethod(env, tweak, backup, hook, is_uninit))
         return 0;
 
@@ -476,19 +479,11 @@ BOOL CJavaHook::LoadDexFile(JNIEnv *env, const char *dexfile, int opt)
     if(access(dexfile, 0))
         return FALSE;
 
-    CJniObj loader(env, env->FindClass("dalvik/system/DexClassLoader"));//这个类是一个未加载的新类，会调用art::ClassLinker::DefineClass
-    if(!loader.GetObj())
+    CJniObj context(env, CAppContext::GetSystemContext(env));
+    if(!context.GetObj())
         return FALSE;
 
-    string apptweak;
-    if(!CJniUtil::CreateAppDir(env, "tweak", apptweak))
-        return FALSE;
-
-    CJniObj app(env, CJniUtil::GetCurrentApplication(env));
-    if(!app.GetObj())
-        return FALSE;
-
-    CJniObj pdcl(env, CJniUtil::CallObjectMethod(env, app, "getClassLoader", "()Ljava/lang/ClassLoader;").l);
+    CJniObj pdcl(env, CJniCall::CallObjectMethod(env, context, "getClassLoader", "()Ljava/lang/ClassLoader;").l);
     if(!pdcl.GetObj())
         return FALSE;
 
@@ -497,8 +492,12 @@ BOOL CJavaHook::LoadDexFile(JNIEnv *env, const char *dexfile, int opt)
     if(strstr(tostring.c_str(), dexfile))
         return FALSE;//已经加载完成了
 
-    string oatfile = apptweak + strrchr(dexfile, '/');
-    if(opt && g_sdkver<=__ANDROID_API_P__ && !OptDexFile(env, dexfile, oatfile.c_str()))
+    string apptweak;
+    if(!CAppContext::CreateAppDir(env, "tweak", apptweak))
+        return FALSE;
+
+    string oatfile = apptweak + string(strrchr(dexfile, '/')) + ".oat";
+    if(opt && g_sdkver<=Pie_9_0 && !OptDexFile(env, dexfile, oatfile.c_str()))
         return FALSE; //Android10及以后版本不再允许从应用进程调用dex2oat
 
     CBaseToJava dexPath(env, dexfile);
@@ -507,30 +506,30 @@ BOOL CJavaHook::LoadDexFile(JNIEnv *env, const char *dexfile, int opt)
     if(!dcl.GetObj())
         return FALSE;
 
-    CJniObj pathList_loaded(env, CJniUtil::GetObjectField(env, pdcl, "pathList", "Ldalvik/system/DexPathList;").l);
+    CJniObj pathList_loaded(env, CJniCall::GetObjectField(env, pdcl, "pathList", "Ldalvik/system/DexPathList;").l);
     if(!pathList_loaded.GetObj())
         return FALSE;
 
-    CJniObj dexElements_loaded(env, CJniUtil::GetObjectField(env, pathList_loaded, "dexElements", "[Ldalvik/system/DexPathList$Element;").l);
+    CJniObj dexElements_loaded(env, CJniCall::GetObjectField(env, pathList_loaded, "dexElements", "[Ldalvik/system/DexPathList$Element;").l);
     if(!dexElements_loaded.GetObj())
         return FALSE;
 
-    CJniObj pathList_loading(env, CJniUtil::GetObjectField(env, dcl, "pathList", "Ldalvik/system/DexPathList;").l);
+    CJniObj pathList_loading(env, CJniCall::GetObjectField(env, dcl, "pathList", "Ldalvik/system/DexPathList;").l);
     if(!pathList_loading.GetObj())
         return FALSE;
 
-    CJniObj dexElements_loading(env, CJniUtil::GetObjectField(env, pathList_loading, "dexElements", "[Ldalvik/system/DexPathList$Element;").l);
+    CJniObj dexElements_loading(env, CJniCall::GetObjectField(env, pathList_loading, "dexElements", "[Ldalvik/system/DexPathList$Element;").l);
     if(!dexElements_loading.GetObj())
         return FALSE;
 
     CJniObj elementClass(env, env->GetObjectClass(dexElements_loaded));
-    CJniObj componentType(env, CJniUtil::CallObjectMethod(env, elementClass, "getComponentType", "()Ljava/lang/Class;").l);
+    CJniObj componentType(env, CJniCall::CallObjectMethod(env, elementClass, "getComponentType", "()Ljava/lang/Class;").l);
     if(!componentType.GetObj())
         return FALSE;
 
     jsize len_loaded = env->GetArrayLength(dexElements_loaded);
     jsize len_new = len_loaded + 1;
-    CJniObj dexElements_new(env, CJniUtil::CallClassMethod(env, "java/lang/reflect/Array", "newInstance", "(Ljava/lang/Class;I)Ljava/lang/Object;", componentType.GetObj(), len_new).l);
+    CJniObj dexElements_new(env, CJniCall::CallClassMethod(env, "java/lang/reflect/Array", "newInstance", "(Ljava/lang/Class;I)Ljava/lang/Object;", componentType.GetObj(), len_new).l);
     if(!dexElements_new.GetObj())
         return FALSE;
 
@@ -545,7 +544,7 @@ BOOL CJavaHook::LoadDexFile(JNIEnv *env, const char *dexfile, int opt)
 
     jvalue value;
     value.l = dexElements_new.GetObj();
-    CJniUtil::SetObjectField(env, pathList_loaded, "dexElements", "[Ldalvik/system/DexPathList$Element;", value);
+    CJniCall::SetObjectField(env, pathList_loaded, "dexElements", "[Ldalvik/system/DexPathList$Element;", value);
     return TRUE;
 }
 
@@ -559,20 +558,7 @@ BOOL CJavaHook::OptDexFile(JNIEnv *env, const char *dexfile, const char *oatfile
         return FALSE;
     if(access(dexfile, 0))
         return FALSE;
-
-    string pack;
-    CJniUtil::GetPackageName(env, pack);
-    if(pack.empty())
-        return FALSE;
-
-    char proc[1024];
-    int fd = open("/proc/self/cmdline", O_RDONLY);
-    int num = read(fd, proc, sizeof(proc));
-    close(fd);
-    if(num<=0 || !proc[0])
-        return FALSE;
-
-    if(pack != proc)
+    if(!CAppContext::IsMainProcess(env))
         return TRUE;//如果是后台进程，这里不需要优化，因为主进程已经优化过了
 
     char features[100], variant[100], Xms[100], Xmx[100];

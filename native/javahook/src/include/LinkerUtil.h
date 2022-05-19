@@ -42,7 +42,7 @@ public:
             else//>=8.0
                 symbol = "__dl__Z9do_dlopenPKciPK17android_dlextinfoPKv";//void* do_dlopen(const char* filename, int flags, const android_dlextinfo* extinfo, const void* caller_addr)
 
-            *(void **)&do_dlopen = elfsym("linker", symbol);
+            *(void **)&do_dlopen = elfsym(sizeof(void*)==8 ? "linker64" : "linker", symbol);
         }
         if((void *)do_dlopen == (void *)-1)
         {
@@ -52,8 +52,7 @@ public:
         if(do_dlopen)
         {
             size_t base; string path;
-            const char *n = strrchr(filename, '/');
-            CProcMaps::GetModulePathAndBase(n?n+1:filename, path, base);
+            CProcMaps::GetModulePathAndBase(filename, path, base);
 
             //注意第四个参数设置, 如果模块已经加载则设置为模块本身的基地址，如果模块未加载则设置为open函数的地址，从而绕过dlopen打开动态库的限制，
             //dlopen默认情况下不可以加载/system/lib目录下的尚未加载的动态库，对已加载的/system/lib下的动态库除了/etc/public.libraries.txt文件指定的外，其它动态库在调用dlsym函数时都是返回0
@@ -81,8 +80,7 @@ public:
             return 0;
 
         size_t base; string path;
-        const char *n = strrchr(filename, '/');
-        if(!CProcMaps::GetModulePathAndBase(n?n+1:filename, path, base))
+        if(!CProcMaps::GetModulePathAndBase(filename, path, base))
             return 0;
 
         string elf;

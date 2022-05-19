@@ -41,29 +41,6 @@ public:
         base = data.base;
         return TRUE;
     }
-    static BOOL GetModulePathAndBase(size_t addr, string &path, size_t &base)
-    {
-        base = 0;
-        path.clear();
-
-        if(!addr)
-            return FALSE;
-
-        /*struct __data__ { size_t base; string path; } data = { addr, "" };
-        if(!TraversalProcMaps(GetModulePathAndBase_callback, &data))
-            return FALSE;
-
-        path = data.path;
-        base = data.base;*/
-
-        Dl_info dli = {0};
-        if(!dladdr((void *)addr, &dli))
-            return FALSE;
-
-        path = dli.dli_fname;
-        base = (size_t)dli.dli_fbase;
-        return TRUE;
-    }
     static BOOL TraversalProcMaps(PROCMAPSCALLBACK callback, void *data)
     {
         if(!callback)
@@ -112,20 +89,27 @@ public:
 protected:
     static BOOL GetModulePathAndBase_callback(const char *address, const char *perms, const char *offset, const char *dev, const char *inode, const char *name, void *data)
     {
-        size_t addr_b, addr_e, addr = *(size_t *)data;
-        const char *_name, *so = ((string *)((size_t *)data + 1))->c_str();
+        long addr_b, addr_e, addr = *(size_t *)data;
+        const char *_name, *_so, *so = ((string *)((size_t *)data + 1))->c_str();
 
         //if(perms[2] != 'x')
         //    return FALSE;
-        if(sscanf(address, "%x-%x", &addr_b, &addr_e) != 2)
+        if(sscanf(address, "%lx-%lx", &addr_b, &addr_e) != 2)
             return FALSE;
 
         if(*so)
         {
+            _so = strrchr(so, '/');
             _name = strrchr(name, '/');
-            _name = (_name ? _name+1 : name);
 
-            if(strcmp(_name, so))
+            int sep = (_so && _name);
+
+            _so = ((!sep&&_so) ? _so+1 : so);
+            _name = ((!sep&&_name) ? _name+1 : name);
+        }
+        if(*so)
+        {
+            if(strcmp(_name, _so))
                 return FALSE;
         }
         else
@@ -133,7 +117,6 @@ protected:
             if(addr < addr_b || addr >= addr_e)
                 return FALSE;
         }
-
         *(string *)((size_t *)data + 1) = name;
         *(size_t *)data = addr_b;
         return TRUE;

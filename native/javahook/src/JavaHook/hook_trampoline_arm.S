@@ -10,7 +10,7 @@
 
 FUNCTION_START_ARM replacement_origin_trampoline
     ldr r0, addr_hook_method    //00 00 9f e5
-    ldr pc, [r0, #0xff]         //ff f0 90 e5
+    ldr pc, [r0, #0x00]         //00 f0 90 e5
 addr_hook_method:
     .long 0xffffffff
 FUNCTION_END replacement_origin_trampoline
