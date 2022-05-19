@@ -1,12 +1,20 @@
-# javahook
+1、javatweak框架目前支持从5.0到11.0的所有版本（无12系统的手机，未测试）
 
-                                                      ART虚拟机中Java方法Hook的实现
+2、demo目录为测试用例，如果不想编译demo，在demo\so______loader\bin\目录下已经编译好了现成的两种架构的apk包。
 
-目前主流的JAVA层hook框架是xposed，但需要重编译art虚拟机，也过于笨重，更重要的是会被app各种检测，有些app一旦发现安装直接强制退出。
-为了不依赖xposed实现Java方法Hook，深入了解art运行机制，因而重新实现了一个轻型的Hook框架，目前已经在Andorid 5.0到8.1的系统上测试通过。
-在实现的过程中，参考了不少同行的实现思路（legend、SandHook、YAHFA），借鉴了其中做的比较好的地方再结合了自己的一些理解，力求在使用上尽可能的简单，设计上尽可能降低系统版本依赖。
+3、测试步骤
 
-详细介绍请参考【安卓ART虚拟机Java Hook框架JavaTweak的设计与实现.docx】
+    adb install demo\so______loader\bin\so______loader.armeabi.apk
+    
+    adb shell mkdir /sdcard/tweak/com.example.so______loader
+    
+    adb push java\javatweak.dex /sdcard/tweak/com.example.so______loader
+    
+    一定要为app开启读写手机存储卡的权限，即可以读写/sdcard目录
+    现在可以点开测试app，点击其中的按钮查看测试结果【注意测试日志需要在logcat中查看】
+    com.example.so______loader为测试包的包名，如果在你自己的app中测试，这个要换成你的app包名
+    
+4、java目录为javatweak.dex插件文件生成目录，此目录主要用于编写hook代码，如果更新了hook代码内容，可以通过java2dex.bat脚本重新生成。
 
+5、native目录是libjavahook.so的源码目录，如果更改了源码可以自己重新编译生成此so。例子apk中，附带了编译好的so
 
-目前支持从5.0到10.0的所有版本
