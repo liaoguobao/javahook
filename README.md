@@ -1,4 +1,4 @@
-1、javatweak框架目前支持从5.0到11.0的所有版本（无12系统的手机，未测试）
+1、javatweak框架目前支持从5.0到11.0的所有版本（无12系统的手机，未测试）,不支持native、interface、abstract等方法的hook
 
 2、demo目录为测试用例，如果不想编译demo，在demo\so______loader\bin\目录下已经编译好了现成的两种架构的apk包。
 
