@@ -51,6 +51,10 @@ CHookHelper::~CHookHelper()
 
 int CHookHelper::InitHookHelper()
 {
+    if(g_offsetAccessFlags)
+    {
+        return 0;
+    }
     int sdkver = CJniUtil::GetAndroidSdkVer();
     if(sdkver < Pie_9_0)
     {

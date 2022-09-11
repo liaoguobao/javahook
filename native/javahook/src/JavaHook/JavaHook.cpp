@@ -8,7 +8,7 @@
 #include "../include/LinkerUtil.h"
 //#include "../include/DebugUtil.h"
 
-static const char*  g_sdkverStr[] = {"Lollipop_5_0", "Lollipop_5_1", "Marshmallow_6_0", "Nougat_7_0", "Nougat_7_1", "Oreo_8_0", "Oreo_8_1", "Pie_9_0", "AndroidQ_10_0", "AndroidR_11_0", "AndroidS_12_0"};
+static const char*  g_sdkverStr[] = {"Lollipop_5_0", "Lollipop_5_1", "Marshmallow_6_0", "Nougat_7_0", "Nougat_7_1", "Oreo_8_0", "Oreo_8_1", "Pie_9_0", "AndroidQ_10_0", "AndroidR_11_0", "AndroidS_12_0", "AndroidT_13_0"};
 static void*        (*Runtime_CreateResolutionMethod)(void* thiz) = 0; //ArtMethod* Runtime::CreateResolutionMethod();
 static void*        g_runtime = 0;
 static void*        g_ArtQuickToInterpreterBridge = 0;
@@ -33,6 +33,10 @@ CJavaHook::~CJavaHook()
 
 BOOL CJavaHook::InitJavaHook(JavaVM *vm)
 {
+    if(g_sdkver)
+    {
+        return TRUE;
+    }
     CHookHelper::InitHookHelper();
     if(!g_sdkver)
     {
@@ -251,6 +255,28 @@ jobject CJavaHook::FindClassMethod(JNIEnv *env, const char *clazz, const char *m
     return obj;
 }
 
+void *  CJavaHook::FindClassJni(JNIEnv *env, jclass clazz, const char *method)
+{
+    if(!g_offsetJniCode)
+        return 0;
+    CJniObj obj(env, FindClassMethod(env, clazz, method));
+    if(!obj.GetObj())
+        return 0;
+
+    void *symbol = *(void **)((size_t)env->FromReflectedMethod(obj) + g_offsetJniCode);
+    return symbol;
+}
+
+void *  CJavaHook::FindClassJni(JNIEnv *env, const char *clazz, const char *method)
+{
+    CJniObj obj(env, CJniUtil::ClassForName(env, clazz));
+    if(!obj.GetObj())
+        return 0;
+
+    void *symbol = FindClassJni(env, obj, method);
+    return symbol;
+}
+
 jobject CJavaHook::BackupMethod(JNIEnv *env, jobject method)
 {
     if(!env || !method)
@@ -298,9 +324,11 @@ jobject CJavaHook::BackupMethod(JNIEnv *env, jobject method)
 
         backupMethod.Attach(env, CJniCall::CallObjectMethod(env, destMethodConstructor, "newInstance", "([Ljava/lang/Object;)Ljava/lang/Object;", 0).l);
 
-        jvalue artMethod;
-        artMethod.j = (jlong)Runtime_CreateResolutionMethod(g_runtime);//新创建的方法artMethod字段是空的，这里要创建ArtMethod，给artMethod字段赋值
+        jlong artMethod = (size_t)Runtime_CreateResolutionMethod(g_runtime);//新创建的方法artMethod字段是空的，这里要创建ArtMethod，给artMethod字段赋值
         CJniCall::SetObjectField(env, backupMethod.GetObj(), "artMethod", "J", artMethod);
+
+        //这里直接利用现有的stub方法，内存创建的方法有时会在hook后引起非法内存访问而崩溃，原因未知
+        backupMethod.Attach(env, CJniCall::CallClassMethod(env, "com/android/guobao/liao/apptweak/JavaTweakStub", "getStubMethod", "()Ljava/lang/reflect/Method;").l);
     }
     CJniObj abstractMethodClass(env, env->FindClass(g_sdkver<=Nougat_7_1?"java/lang/reflect/AbstractMethod":"java/lang/reflect/Executable"));
     CJniObj methodFields(env, CJniCall::CallObjectMethod(env, abstractMethodClass, "getDeclaredFields", "()[Ljava/lang/reflect/Field;").l);
@@ -476,7 +504,7 @@ BOOL CJavaHook::LoadDexFile(JNIEnv *env, const char *dexfile, int opt)
         return FALSE;
     if(!dexfile || !*dexfile)
         return FALSE;
-    if(access(dexfile, 0))
+    if(access(dexfile, R_OK))
         return FALSE;
 
     CJniObj context(env, CAppContext::GetSystemContext(env));
@@ -497,12 +525,23 @@ BOOL CJavaHook::LoadDexFile(JNIEnv *env, const char *dexfile, int opt)
         return FALSE;
 
     string oatfile = apptweak + string(strrchr(dexfile, '/')) + ".oat";
-    if(opt && g_sdkver<=Pie_9_0 && !OptDexFile(env, dexfile, oatfile.c_str()))
-        return FALSE; //Android10及以后版本不再允许从应用进程调用dex2oat
+    if(opt && g_sdkver<=Pie_9_0) //Android10及以后版本不再允许从应用进程调用dex2oat
+        OptDexFile(env, dexfile, oatfile.c_str());
 
-    CBaseToJava dexPath(env, dexfile);
-    CBaseToJava optPath(env, apptweak.c_str());
-    CJniObj dcl(env, CJniUtil::NewClassObject(env, "dalvik/system/DexClassLoader", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/ClassLoader;)V", dexPath.GetObject(), optPath.GetObject(), 0, pdcl.GetObj()));
+    CJniObj dcl;
+    if(g_sdkver >= Oreo_8_0)
+    {
+        string binbuf; CFileUtil::ReadBinDataFromFile(dexfile, binbuf);
+        CBaseToJava javabuf(env, (jbyte *)binbuf.c_str(), binbuf.size());
+        CJniObj bytebuf(env, CJniCall::CallClassMethod(env, "java/nio/ByteBuffer", "wrap", "([B)Ljava/nio/ByteBuffer;", javabuf.GetObject()).l);
+        dcl.Attach(env, CJniUtil::NewClassObject(env, "dalvik/system/InMemoryDexClassLoader", "(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V", bytebuf.GetObj(), pdcl.GetObj()));
+    }
+    else
+    {
+        CBaseToJava dexPath(env, dexfile);
+        CBaseToJava optPath(env, apptweak.c_str());
+        dcl.Attach(env, CJniUtil::NewClassObject(env, "dalvik/system/DexClassLoader", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/ClassLoader;)V", dexPath.GetObject(), optPath.GetObject(), 0, pdcl.GetObj()));
+    }
     if(!dcl.GetObj())
         return FALSE;
 
@@ -519,7 +558,7 @@ BOOL CJavaHook::LoadDexFile(JNIEnv *env, const char *dexfile, int opt)
         return FALSE;
 
     CJniObj dexElements_loading(env, CJniCall::GetObjectField(env, pathList_loading, "dexElements", "[Ldalvik/system/DexPathList$Element;").l);
-    if(!dexElements_loading.GetObj())
+    if(!dexElements_loading.GetObj() || !env->GetArrayLength(dexElements_loading))
         return FALSE;
 
     CJniObj elementClass(env, env->GetObjectClass(dexElements_loaded));
@@ -541,10 +580,7 @@ BOOL CJavaHook::LoadDexFile(JNIEnv *env, const char *dexfile, int opt)
         CJniObj dexElement_loaded(env, env->GetObjectArrayElement(dexElements_loaded, i-1));
         env->SetObjectArrayElement(dexElements_new, i, dexElement_loaded);
     }
-
-    jvalue value;
-    value.l = dexElements_new.GetObj();
-    CJniCall::SetObjectField(env, pathList_loaded, "dexElements", "[Ldalvik/system/DexPathList$Element;", value);
+    CJniCall::SetObjectField(env, pathList_loaded, "dexElements", "[Ldalvik/system/DexPathList$Element;", (jlong)dexElements_new.GetObj());
     return TRUE;
 }
 
@@ -556,14 +592,19 @@ BOOL CJavaHook::OptDexFile(JNIEnv *env, const char *dexfile, const char *oatfile
         return FALSE;
     if(!oatfile || !*oatfile)
         return FALSE;
-    if(access(dexfile, 0))
+    if(access(dexfile, R_OK))
         return FALSE;
     if(!CAppContext::IsMainProcess(env))
         return TRUE;//如果是后台进程，这里不需要优化，因为主进程已经优化过了
 
     char features[100], variant[100], Xms[100], Xmx[100];
+#if defined(__arm__)
     __system_property_get("dalvik.vm.isa.arm.features", features);
     __system_property_get("dalvik.vm.isa.arm.variant", variant);
+#elif defined(__aarch64__)
+    __system_property_get("dalvik.vm.isa.arm64.features", features);
+    __system_property_get("dalvik.vm.isa.arm64.variant", variant);
+#endif
     __system_property_get("dalvik.vm.dex2oat-Xms", Xms);
     __system_property_get("dalvik.vm.dex2oat-Xmx", Xmx);
 
@@ -571,7 +612,11 @@ BOOL CJavaHook::OptDexFile(JNIEnv *env, const char *dexfile, const char *oatfile
     string cmdline("/system/bin/dex2oat");
     cmdline += " --runtime-arg -classpath";
     cmdline += " --runtime-arg \"&\""; //Special classpath that skips shared library check.
+#if defined(__arm__)
     cmdline += " --instruction-set=arm";
+#elif defined(__aarch64__)
+    cmdline += " --instruction-set=arm64";
+#endif
     cmdline += " --instruction-set-features=" + string(features);
     //cmdline += " --instruction-set-variant=" + string(variant);
     cmdline += " --compiler-filter=speed";
@@ -596,6 +641,10 @@ BOOL CJavaHook::OptDexFile(JNIEnv *env, const char *dexfile, const char *oatfile
     cmdline += " 2>&1";
     //先优化一次，防止app带 --compiler-filter=verify-none --compiler-filter=interpret-only命令,导致方法不生成汇编代码
     FILE *pf = popen(cmdline.c_str(), "r");
+    if(!pf)
+    {
+        return FALSE; //腾讯乐固这里会返回空
+    }
     size_t once = fread(buf, 1, sizeof(buf), pf);
     pclose(pf);
     return !once;

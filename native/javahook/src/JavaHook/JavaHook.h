@@ -23,6 +23,9 @@ public:
     static jobject FindClassMethod(JNIEnv *env, jclass clazz, const char *method);
     static jobject FindClassMethod(JNIEnv *env, const char *clazz, const char *method);
 
+    static void *  FindClassJni(JNIEnv *env, jclass clazz, const char *method);
+    static void *  FindClassJni(JNIEnv *env, const char *clazz, const char *method);
+
     static jobject HookMethod(JNIEnv *env, jclass tweak_class, const char *tweak_method, jclass hook_class, const char *hook_method);
     static jobject HookMethod(JNIEnv *env, const char *tweak_class, const char *tweak_method, const char *hook_class, const char *hook_method);
 };

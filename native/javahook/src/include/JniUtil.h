@@ -354,7 +354,7 @@ public:
 
         return hr;
     }
-    static BOOL SetClassField(JNIEnv *env, const char *clazz, const char *name, const char *sig, jvalue value)
+    static BOOL SetClassField(JNIEnv *env, const char *clazz, const char *name, const char *sig, jlong value)
     {
         if(!env)
             return FALSE;
@@ -376,27 +376,27 @@ public:
         int flag = sig[0];
 
         if(flag == 'Z')
-            env->SetStaticBooleanField(clsObj, fieldID, value.z);
+            env->SetStaticBooleanField(clsObj, fieldID, (jboolean)value);
         else if(flag == 'B')
-            env->SetStaticByteField(clsObj, fieldID, value.b);
+            env->SetStaticByteField(clsObj, fieldID, (jbyte)value);
         else if(flag == 'C')
-            env->SetStaticCharField(clsObj, fieldID, value.c);
+            env->SetStaticCharField(clsObj, fieldID, (jchar)value);
         else if(flag == 'S')
-            env->SetStaticShortField(clsObj, fieldID, value.s);
+            env->SetStaticShortField(clsObj, fieldID, (jshort)value);
         else if(flag == 'I')
-            env->SetStaticIntField(clsObj, fieldID, value.i);
+            env->SetStaticIntField(clsObj, fieldID, (jint)value);
         else if(flag == 'J')
-            env->SetStaticLongField(clsObj, fieldID, value.j);
+            env->SetStaticLongField(clsObj, fieldID, (jlong)value);
         else if(flag == 'F')
-            env->SetStaticFloatField(clsObj, fieldID, value.f);
+            env->SetStaticFloatField(clsObj, fieldID, (jfloat)value);
         else if(flag == 'D')
-            env->SetStaticDoubleField(clsObj, fieldID, value.d);
+            env->SetStaticDoubleField(clsObj, fieldID, (jdouble)value);
         else if(flag == 'L' || flag == '[')
-            env->SetStaticObjectField(clsObj, fieldID, value.l);
+            env->SetStaticObjectField(clsObj, fieldID, (jobject)value);
 
         return TRUE;
     }
-    static BOOL SetObjectField(JNIEnv *env, jobject obj, const char *name, const char *sig, jvalue value)
+    static BOOL SetObjectField(JNIEnv *env, jobject obj, const char *name, const char *sig, jlong value)
     {
         if(!env || !obj)
             return FALSE;
@@ -416,23 +416,23 @@ public:
         int flag = sig[0];
 
         if(flag == 'Z')
-            env->SetBooleanField(obj, fieldID, value.z);
+            env->SetBooleanField(obj, fieldID, (jboolean)value);
         else if(flag == 'B')
-            env->SetByteField(obj, fieldID, value.b);
+            env->SetByteField(obj, fieldID, (jbyte)value);
         else if(flag == 'C')
-            env->SetCharField(obj, fieldID, value.c);
+            env->SetCharField(obj, fieldID, (jchar)value);
         else if(flag == 'S')
-            env->SetShortField(obj, fieldID, value.s);
+            env->SetShortField(obj, fieldID, (jshort)value);
         else if(flag == 'I')
-            env->SetIntField(obj, fieldID, value.i);
+            env->SetIntField(obj, fieldID, (jint)value);
         else if(flag == 'J')
-            env->SetLongField(obj, fieldID, value.j);
+            env->SetLongField(obj, fieldID, (jlong)value);
         else if(flag == 'F')
-            env->SetFloatField(obj, fieldID, value.f);
+            env->SetFloatField(obj, fieldID, (jfloat)value);
         else if(flag == 'D')
-            env->SetDoubleField(obj, fieldID, value.d);
+            env->SetDoubleField(obj, fieldID, (jdouble)value);
         else if(flag == 'L' || flag == '[')
-            env->SetObjectField(obj, fieldID, value.l);
+            env->SetObjectField(obj, fieldID, (jobject)value);
 
         return TRUE;
     }
@@ -940,8 +940,7 @@ public:
         if(!jname.GetObj())
             return FALSE;
 
-        CJavaToBase jstr(env, (jstring)jname.GetObj());
-        pname = (char *)jstr.GetValue();
+        pname = CJavaToBase(env, (jstring)jname.GetObj());
         return TRUE;
     }
     static BOOL GetProcessName(JNIEnv *env, string &pname)
@@ -954,8 +953,7 @@ public:
         if(!jname.GetObj())
             return FALSE;
 
-        CJavaToBase jstr(env, (jstring)jname.GetObj());
-        pname = (char *)jstr.GetValue();
+        pname = CJavaToBase(env, (jstring)jname.GetObj());
         return TRUE;
     }
     static BOOL IsMainProcess(JNIEnv *env)
@@ -1009,8 +1007,7 @@ public:
         if(!jdpath.GetObj())
             return FALSE;
 
-        CJavaToBase jstr(env, (jstring)jdpath.GetObj());
-        dpath = (char *)jstr.GetValue();
+        dpath = CJavaToBase(env, (jstring)jdpath.GetObj());
         return TRUE;
     }
     static BOOL CreateAppDir(JNIEnv *env, const char *dname, string &dpath)//data/user/0/com.example.so______loader/app_{dname}
@@ -1078,7 +1075,7 @@ public:
         jobject pi = jpi.Detach();
         return pi;
     }
-    static BOOL GetPackageSignature(JNIEnv *env, string &sign)
+    static BOOL GetAppCert(JNIEnv *env, string &sign)
     {
         sign.clear();
         if(!env)
@@ -1118,8 +1115,7 @@ public:
         if(!jdpath.GetObj())
             return FALSE;
 
-        CJavaToBase jstr(env, (jstring)jdpath.GetObj());
-        dpath = (char *)jstr.GetValue();
+        dpath = CJavaToBase(env, (jstring)jdpath.GetObj());
         return TRUE;
     }
     static BOOL GetLibraryDir(JNIEnv *env, string &dpath)//data/app/com.example.so______loader-G8MQWyEGdIQMNvVcXNWQbQ==/lib/arm
@@ -1136,8 +1132,7 @@ public:
         if(!jdpath.GetObj())
             return FALSE;
 
-        CJavaToBase jstr(env, (jstring)jdpath.GetObj());
-        dpath = (char *)jstr.GetValue();
+        dpath = CJavaToBase(env, (jstring)jdpath.GetObj());
         return TRUE;
     }
     static BOOL GetExternalStorageDir(JNIEnv *env, string &dpath)//storage/emulated/0
@@ -1154,38 +1149,24 @@ public:
         if(!jdpath.GetObj())
             return FALSE;
 
-        CJavaToBase jstr(env, (jstring)jdpath.GetObj());
-        dpath = (char *)jstr.GetValue();
+        dpath = CJavaToBase(env, (jstring)jdpath.GetObj());
         return TRUE;
     }
-    static BOOL GetAssetData(JNIEnv *env, const char *assetname, string &data)
+    static BOOL GetAppCpuAbi(JNIEnv *env, string &abi)//armeabi,armeabi-v7a,arm64-v8a
     {
-        data.clear();
-        if(!env || !assetname || !*assetname)
+        abi.clear();
+        if(!env)
             return FALSE;
 
-        CJniObj context(env, GetApplication(env));
-        if(!context.GetObj())
+        CJniObj ai(env, GetApplicationInfo(env));
+        if(!ai.GetObj())
             return FALSE;
 
-        CJniObj am(env, CJniCall::CallObjectMethod(env, context, "getAssets", "()Landroid/content/res/AssetManager;").l);
-        if(!am.GetObj())
+        CJniObj jabi(env, CJniCall::GetObjectField(env, ai, "primaryCpuAbi", "Ljava/lang/String;").l);
+        if(!jabi.GetObj())
             return FALSE;
 
-        CBaseToJava name_(env, assetname);
-        CJniObj is(env, CJniCall::CallObjectMethod(env, am, "open", "(Ljava/lang/String;)Ljava/io/InputStream;", name_.GetObject()).l);
-        if(!is.GetObj())
-            return FALSE;
-
-        int n = 0;
-        jbyteArray buf = env->NewByteArray(0x1000);
-        while((n = CJniCall::CallObjectMethod(env, is, "read", "([B)I", buf).i) > 0)
-        {
-            char *d = (char *)env->GetByteArrayElements(buf, 0);
-            data.append(d, n);
-            env->ReleaseByteArrayElements(buf, (jbyte *)d, 0);
-        }
-        env->DeleteLocalRef(buf);
+        abi = CJavaToBase(env, (jstring)jabi.GetObj());
         return TRUE;
     }
 };
@@ -1311,8 +1292,7 @@ public:
         if(!strObj.GetObj())
             return FALSE;
 
-        CJavaToBase jstr(env, (jstring)strObj.GetObj());
-        name = (char *)jstr.GetValue();
+        name = CJavaToBase(env, (jstring)strObj.GetObj());
         return TRUE;
     }
     static BOOL ObjectToString(JNIEnv *env, jobject obj, string &str)
@@ -1380,8 +1360,7 @@ public:
             if(!strObj.GetObj())
                 return FALSE;
 
-            CJavaToBase jstr(env, (jstring)strObj.GetObj());
-            str += (char *)jstr.GetValue();
+            str += CJavaToBase(env, (jstring)strObj.GetObj());
         }
         return TRUE;
     }
@@ -1462,8 +1441,7 @@ public:
         if(!strObj.GetObj())
             return FALSE;
 
-        CJavaToBase jstr(env, (jstring)strObj.GetObj());
-        trace = (char *)jstr.GetValue();
+        trace = CJavaToBase(env, (jstring)strObj.GetObj());
         return TRUE;
     }
     static BOOL IsClassObject(JNIEnv *env, jobject obj)
@@ -1586,6 +1564,91 @@ public:
         jclass clazz = !loader?0:(jclass)CJniCall::CallClassMethod(env, "java/lang/Class", "forName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;", name_.GetObject(), init, loader).l;
         return clazz;
     }
+    static BOOL ClassToString(JNIEnv *env, const char *clazz, string &str)
+    {
+        str.clear();
+        if(!env)
+            return FALSE;
+        if(!clazz || !*clazz)
+            return FALSE;
+
+        CJniObj clsObj(env, env->FindClass(clazz));
+        if(!clsObj.GetObj())
+            return FALSE;
+
+        char buf[256];
+        str = clazz;
+        str += "->classToString{\r\n";
+
+        CJniObj fields(env, CJniCall::CallObjectMethod(env, clsObj, "getDeclaredFields", "()[Ljava/lang/reflect/Field;").l);
+        jsize flen = env->GetArrayLength(fields);
+        for(jsize i = 0; i < flen; ++i)
+        {
+            CJniObj ele(env, env->GetObjectArrayElement(fields, i));
+            CJniObj generic(env, CJniCall::CallObjectMethod(env, ele, "toGenericString", "()Ljava/lang/String;").l);
+
+            //private transient java.lang.Class java.lang.Object.shadow$_klass_
+            sprintf(buf, "\tf%02d: %s\r\n", i, (char *)CJavaToBase(env, (jstring)generic.GetObj()).GetValue());
+            str += buf;
+        }
+        CJniObj constructors(env, CJniCall::CallObjectMethod(env, clsObj, "getDeclaredConstructors", "()[Ljava/lang/reflect/Constructor;").l);
+        jsize clen = env->GetArrayLength(constructors);
+        for(jsize i = 0; i < clen; ++i)
+        {
+            CJniObj ele(env, env->GetObjectArrayElement(constructors, i));
+            CJniObj generic(env, CJniCall::CallObjectMethod(env, ele, "toGenericString", "()Ljava/lang/String;").l);
+
+            //private java.lang.Object()
+            sprintf(buf, "\tc%02d: %s\r\n", i, (char *)CJavaToBase(env, (jstring)generic.GetObj()).GetValue());
+            str += buf;
+        }
+        CJniObj methods(env, CJniCall::CallObjectMethod(env, clsObj, "getDeclaredMethods", "()[Ljava/lang/reflect/Method;").l);
+        jsize mlen = env->GetArrayLength(methods);
+        for(jsize i = 0; i < mlen; ++i)
+        {
+            CJniObj ele(env, env->GetObjectArrayElement(methods, i));
+            CJniObj generic(env, CJniCall::CallObjectMethod(env, ele, "toGenericString", "()Ljava/lang/String;").l);
+
+            //java.lang.reflect.Method->public static java.lang.String com.bonree.agent.android.engine.external.JSONObjectInstrumentation.toString(org.json.JSONObject,int) throws org.json.JSONException
+            sprintf(buf, "\tm%02d: %s\r\n", i, (char *)CJavaToBase(env, (jstring)generic.GetObj()).GetValue());
+            str += buf;
+        }
+        str += "}\r\n";
+        return TRUE;
+    }
+    static BOOL FieldToString(JNIEnv *env, jobject obj, string &str)
+    {
+        str.clear();
+        if(!env || !obj)
+            return FALSE;
+
+        CJniObj objClass(env, CJniUtil::ObjectToClass(env, obj));
+        CJniObj objFields(env, CJniCall::CallObjectMethod(env, objClass, "getDeclaredFields", "()[Ljava/lang/reflect/Field;").l);
+
+        CJniUtil::GetObjectClassName(env, obj, str);
+        str += "->fieldToString{\r\n";
+
+        jsize len = env->GetArrayLength(objFields);
+        for(jsize i = 0; i < len; ++i)
+        {
+            CJniObj objField(env, env->GetObjectArrayElement(objFields, i));
+
+            CJniObj fieldName(env, CJniCall::CallObjectMethod(env, objField, "getName", "()Ljava/lang/String;").l);
+            CJavaToBase _fieldName(env, (jstring)fieldName.GetObj());
+
+            CJniCall::CallObjectMethod(env, objField, "setAccessible", "(Z)V", 1);
+            CJniObj fieldValue(env, CJniCall::CallObjectMethod(env, objField, "get", "(Ljava/lang/Object;)Ljava/lang/Object;", obj).l);
+
+            string _fieldValue;
+            CJniUtil::ObjectToString(env, fieldValue, _fieldValue);
+
+            str += "\t";
+            str += (char *)_fieldName.GetValue();
+            str += " = " + _fieldValue + "\r\n";
+        }
+        str += "}\r\n";
+        return TRUE;
+    }
 };
 
 class CJniEnv
@@ -1644,171 +1707,119 @@ public:
     }
 };
 
-class CJavaClass
+class CApkUtil
 {
 protected:
-    CJavaClass()
+    CApkUtil()
     {
     }
-    ~CJavaClass()
+    ~CApkUtil()
     {
     }
 
 public:
-    static BOOL GetClassFields(JNIEnv *env, const char *clazz, vector<string> &fields)
+    static BOOL GetApkAsset(JNIEnv *env, const char *name, string &asset)
     {
-        fields.clear();
-        if(!env)
-            return FALSE;
-        if(!clazz || !*clazz)
+        asset.clear();
+        if(!env || !name || !*name)
             return FALSE;
 
-        CJniObj clsObj(env, env->FindClass(clazz));
-        if(!clsObj.GetObj())
-            return FALSE;
+        BOOL ok = 0;
+        CJniObj zip, stream;
+        do{
+        string apk;
+        if(!CAppContext::GetSourceDir(env, apk))
+            break;
 
-        CJniObj arrObj(env, CJniCall::CallObjectMethod(env, clsObj, "getDeclaredFields", "()[Ljava/lang/reflect/Field;").l);
-        if(!arrObj.GetObj())
-            return FALSE;
+        zip.Attach(env, CJniUtil::NewClassObject(env, "java/util/zip/ZipFile", "(Ljava/lang/String;)V", CBaseToJava(env, apk.c_str()).GetObject()));
+        if(!zip.GetObj())
+            break;
 
-        jsize len = env->GetArrayLength(arrObj);
+        CJniObj entry(env, CJniCall::CallObjectMethod(env, zip, "getEntry", "(Ljava/lang/String;)Ljava/util/zip/ZipEntry;", CBaseToJava(env, name).GetObject()).l);
+        if(!entry.GetObj())
+            break;
 
-        for(jsize i = 0; i < len; ++i)
+        stream.Attach(env, CJniCall::CallObjectMethod(env, zip, "getInputStream", "(Ljava/util/zip/ZipEntry;)Ljava/io/InputStream;", entry.GetObj()).l);
+        if(!stream.GetObj())
+            break;
+
+        int n = 0;
+        jbyteArray buf = env->NewByteArray(0x1000);
+        while((n = CJniCall::CallObjectMethod(env, stream, "read", "([B)I", buf).i) > 0)
         {
-            CJniObj ele(env, env->GetObjectArrayElement(arrObj, i));
-
-            string tostring;
-            CJniUtil::ObjectToString(env, ele, tostring);
-
-            //java.lang.reflect.Field->private transient java.lang.Class java.lang.Object.shadow$_klass_
-            const char *__beg = strstr(tostring.c_str(), "->");
-            if(!__beg)
-                continue;
-
-            //private transient java.lang.Class java.lang.Object.shadow$_klass_
-            string sign(__beg + 2);
-            fields.push_back(sign);
+            char *d = (char *)env->GetByteArrayElements(buf, 0);
+            asset.append(d, n);
+            env->ReleaseByteArrayElements(buf, (jbyte *)d, 0);
         }
-        return TRUE;
+        env->DeleteLocalRef(buf);
+        ok = 1;
+        }while(0);
+        CJniCall::CallObjectMethod(env, stream, "close", "()V");
+        CJniCall::CallObjectMethod(env, zip, "close", "()V");
+        return ok;
     }
-    static BOOL GetClassMethods(JNIEnv *env, const char *clazz, vector<string> &methods)
+    static BOOL ExtractApkAsset(JNIEnv *env, const char *name, const char *path)
     {
-        methods.clear();
-        if(!env)
-            return FALSE;
-        if(!clazz || !*clazz)
+        if(!env || !name || !*name || !path || !*path)
             return FALSE;
 
-        CJniObj clsObj(env, env->FindClass(clazz));
-        if(!clsObj.GetObj())
-            return FALSE;
+        BOOL ok = 0;
+        FILE *pf = 0;
+        CJniObj zip, stream;
+        do{
+        pf = fopen(path, "wb");
+        if(!pf)
+            break;
 
-        CJniObj arrObj(env, CJniCall::CallObjectMethod(env, clsObj, "getDeclaredMethods", "()[Ljava/lang/reflect/Method;").l);
-        if(!arrObj.GetObj())
-            return FALSE;
+        string apk;
+        if(!CAppContext::GetSourceDir(env, apk))
+            break;
 
-        jsize len = env->GetArrayLength(arrObj);
+        zip.Attach(env, CJniUtil::NewClassObject(env, "java/util/zip/ZipFile", "(Ljava/lang/String;)V", CBaseToJava(env, apk.c_str()).GetObject()));
+        if(!zip.GetObj())
+            break;
 
-        for(jsize i = 0; i < len; ++i)
+        CJniObj entry(env, CJniCall::CallObjectMethod(env, zip, "getEntry", "(Ljava/lang/String;)Ljava/util/zip/ZipEntry;", CBaseToJava(env, name).GetObject()).l);
+        if(!entry.GetObj())
+            break;
+
+        stream.Attach(env, CJniCall::CallObjectMethod(env, zip, "getInputStream", "(Ljava/util/zip/ZipEntry;)Ljava/io/InputStream;", entry.GetObj()).l);
+        if(!stream.GetObj())
+            break;
+
+        int n = 0;
+        jbyteArray buf = env->NewByteArray(0x1000);
+        while((n = CJniCall::CallObjectMethod(env, stream, "read", "([B)I", buf).i) > 0)
         {
-            CJniObj ele(env, env->GetObjectArrayElement(arrObj, i));
-
-            string tostring;
-            CJniUtil::ObjectToString(env, ele, tostring);
-
-            //java.lang.reflect.Method->public static java.lang.String com.bonree.agent.android.engine.external.JSONObjectInstrumentation.toString(org.json.JSONObject,int) throws org.json.JSONException
-            const char *__beg = strstr(tostring.c_str(), "->");
-            const char *__end = strrchr(__beg, ')');
-
-            if(!__beg || !__end)
-                continue;
-
-            //public static java.lang.String com.bonree.agent.android.engine.external.JSONObjectInstrumentation.toString(org.json.JSONObject,int)
-            string sign(__beg + 2, __end - __beg - 1);
-            methods.push_back(sign);
+            char *d = (char *)env->GetByteArrayElements(buf, 0);
+            fwrite(d, n, 1, pf);
+            env->ReleaseByteArrayElements(buf, (jbyte *)d, 0);
         }
-        return TRUE;
+        env->DeleteLocalRef(buf);
+        ok = 1;
+        }while(0);
+        CJniCall::CallObjectMethod(env, stream, "close", "()V");
+        CJniCall::CallObjectMethod(env, zip, "close", "()V");
+        if(pf) fclose(pf);
+        return ok;
     }
-    static BOOL ClassFieldsToString(JNIEnv *env, const char *clazz, string &str)
+    static int ExistApkAsset(JNIEnv *env, const char *name)
     {
-        str.clear();
-        if(!env)
-            return FALSE;
-        if(!clazz || !*clazz)
-            return FALSE;
+        if(!env || !name || !*name)
+            return -1;
 
-        str = clazz;
-        str += "->getDeclaredFields{\r\n";
+        string apk;
+        if(!CAppContext::GetSourceDir(env, apk))
+            return -1;
 
-        vector<string> fields;
-        GetClassFields(env, clazz, fields);
+        CJniObj zip(env, CJniUtil::NewClassObject(env, "java/util/zip/ZipFile", "(Ljava/lang/String;)V", CBaseToJava(env, apk.c_str()).GetObject()));
+        if(!zip.GetObj())
+            return -1;
 
-        for(int i = 0; i < (int)fields.size(); ++i)
-        {
-            char buf[64];
-            sprintf(buf, "\titem = %d, field = <", i);
-            str += buf + fields[i] + ">\r\n";
-        }
+        CJniObj entry(env, CJniCall::CallObjectMethod(env, zip, "getEntry", "(Ljava/lang/String;)Ljava/util/zip/ZipEntry;", CBaseToJava(env, name).GetObject()).l);
 
-        str += "}\r\n";
-        return TRUE;
-    }
-    static BOOL ClassMethodsToString(JNIEnv *env, const char *clazz, string &str)
-    {
-        str.clear();
-        if(!env)
-            return FALSE;
-        if(!clazz || !*clazz)
-            return FALSE;
-
-        str = clazz;
-        str += "->getDeclaredMethods{\r\n";
-
-        vector<string> methods;
-        GetClassMethods(env, clazz, methods);
-
-        for(int i = 0; i < (int)methods.size(); ++i)
-        {
-            char buf[64];
-            sprintf(buf, "\titem = %d, method = <", i);
-            str += buf + methods[i] + ">\r\n";
-        }
-
-        str += "}\r\n";
-        return TRUE;
-    }
-    static BOOL ObjectFieldsToString(JNIEnv *env, jobject obj, string &str)
-    {
-        str.clear();
-        if(!env || !obj)
-            return FALSE;
-
-        CJniObj objClass(env, CJniUtil::ObjectToClass(env, obj));
-        CJniObj objFields(env, CJniCall::CallObjectMethod(env, objClass, "getDeclaredFields", "()[Ljava/lang/reflect/Field;").l);
-
-        CJniUtil::GetObjectClassName(env, obj, str);
-        str += "->getObjectFields{\r\n";
-
-        jsize len = env->GetArrayLength(objFields);
-        for(jsize i = 0; i < len; ++i)
-        {
-            CJniObj objField(env, env->GetObjectArrayElement(objFields, i));
-
-            CJniObj fieldName(env, CJniCall::CallObjectMethod(env, objField, "getName", "()Ljava/lang/String;").l);
-            CJavaToBase _fieldName(env, (jstring)fieldName.GetObj());
-
-            CJniCall::CallObjectMethod(env, objField, "setAccessible", "(Z)V", 1);
-            CJniObj fieldValue(env, CJniCall::CallObjectMethod(env, objField, "get", "(Ljava/lang/Object;)Ljava/lang/Object;", obj).l);
-
-            string _fieldValue;
-            CJniUtil::ObjectToString(env, fieldValue, _fieldValue);
-
-            str += "\t";
-            str += (char *)_fieldName.GetValue();
-            str += " = " + _fieldValue + "\r\n";
-        }
-        str += "}\r\n";
-        return TRUE;
+        CJniCall::CallObjectMethod(env, zip, "close", "()V");
+        return !!entry.GetObj();
     }
 };
 #endif

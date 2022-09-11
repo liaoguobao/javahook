@@ -6,7 +6,7 @@
 #define __ANDROID_API_VER__   Lollipop_5_0
 
 #define __ANDROID_API_MIN__   Lollipop_5_0
-#define __ANDROID_API_MAX__   AndroidS_12_0
+#define __ANDROID_API_MAX__   AndroidT_13_0
 
 #define __ANDROID_API_L__     21 //5.0
 #define __ANDROID_API_L_MR1__ 22 //5.1
@@ -19,6 +19,7 @@
 #define __ANDROID_API_Q__     29 //10.0
 #define __ANDROID_API_R__     30 //11.0
 #define __ANDROID_API_S__     31 //12.0
+#define __ANDROID_API_T__     32 //13.0
 
 #define Lollipop_5_0          __ANDROID_API_L__
 #define Lollipop_5_1          __ANDROID_API_L_MR1__
@@ -31,6 +32,7 @@
 #define AndroidQ_10_0         __ANDROID_API_Q__
 #define AndroidR_11_0         __ANDROID_API_R__
 #define AndroidS_12_0         __ANDROID_API_S__
+#define AndroidT_13_0         __ANDROID_API_T__
 
 #define POINTER_SIZE          sizeof(void*)
 #define POINTER_ROUND_DOWN(x) (((size_t)(x))                   & (~(POINTER_SIZE-1)))
@@ -90,6 +92,11 @@
 #define OFFSET_REPLACEMENT_JNI_CODE         (OFFSET_PTR_SIZED_FIELDS+POINTER_SIZE*0)
 #define OFFSET_REPLACEMENT_COMPILED_CODE    (OFFSET_REPLACEMENT_JNI_CODE+POINTER_SIZE)
 #elif __ANDROID_API_VER__ == AndroidS_12_0
+#define OFFSET_REPLACEMENT_ACCESS_FLAGS     4
+#define OFFSET_PTR_SIZED_FIELDS             POINTER_ROUND_UP(16)
+#define OFFSET_REPLACEMENT_JNI_CODE         (OFFSET_PTR_SIZED_FIELDS+POINTER_SIZE*0)
+#define OFFSET_REPLACEMENT_COMPILED_CODE    (OFFSET_REPLACEMENT_JNI_CODE+POINTER_SIZE)
+#elif __ANDROID_API_VER__ == AndroidT_13_0
 #define OFFSET_REPLACEMENT_ACCESS_FLAGS     4
 #define OFFSET_PTR_SIZED_FIELDS             POINTER_ROUND_UP(16)
 #define OFFSET_REPLACEMENT_JNI_CODE         (OFFSET_PTR_SIZED_FIELDS+POINTER_SIZE*0)

@@ -3,7 +3,7 @@
 #include "../include/platform.h"
 #if defined(_WIN32)
 #include "../include/detours/detours.h"
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__APPLE__)
 #include "../include/substrate/substrate.h"
 #elif defined(__aarch64__)
 #include "../include/funchook/funchook.h"
@@ -33,7 +33,7 @@ int CApiHook::HookFunction(size_t symbol, size_t hook, size_t *old)
     ::DetourUpdateThread(::GetCurrentThread());
     ::DetourAttach((void **)&_old, (void *)hook);
     ::DetourTransactionCommit();
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__APPLE__)
     MSHookFunction((void *)symbol, (void *)hook, (void **)&_old);
 #elif defined(__aarch64__)
     funchook_t *fh = funchook_create();

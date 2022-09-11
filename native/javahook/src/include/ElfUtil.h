@@ -116,6 +116,44 @@ public:
         }
         return 0;
     }
+    static const ElfW(Sym)* GetDynSym(const unsigned char *elf)
+    {
+        if(!elf)
+            return 0;
+
+        const ElfW(Dyn) *dyn_symtab = GetDyn(elf, DT_SYMTAB);
+        if(dyn_symtab)
+            return (ElfW(Sym) *)(elf + dyn_symtab->d_un.d_ptr);
+
+        const ElfW(Shdr) *shdr_dynsym = GetShdr(elf, ".dynsym");
+        if(shdr_dynsym)
+            return (ElfW(Sym) *)(elf + shdr_dynsym->sh_offset);
+
+        const ElfW(Shdr) *shdr_symtab = GetShdr(elf, SHT_SYMTAB);
+        if(shdr_symtab)
+            return (ElfW(Sym) *)(elf + shdr_symtab->sh_offset);
+
+        return 0;
+    }
+    static const char* GetDynStr(const unsigned char *elf)
+    {
+        if(!elf)
+            return 0;
+
+        const ElfW(Dyn) *dyn_strtab = GetDyn(elf, DT_STRTAB);
+        if(dyn_strtab)
+            return (char *)(elf + dyn_strtab->d_un.d_ptr);
+
+        const ElfW(Shdr) *shdr_dynstr = GetShdr(elf, ".dynstr");
+        if(shdr_dynstr)
+            return (char *)(elf + shdr_dynstr->sh_offset);
+
+        const ElfW(Shdr) *shdr_strtab = GetShdr(elf, SHT_STRTAB);
+        if(shdr_strtab)
+            return (char *)(elf + shdr_strtab->sh_offset);
+
+        return 0;
+    }
     static ElfW(Addr) GetSym_offset(const unsigned char *elf, const char *st_name)
     {
         if(!elf || !st_name || !*st_name)
@@ -232,11 +270,10 @@ public:
         const ElfW(Phdr) *phdr_dyna = GetPhdr(elf, PT_DYNAMIC);
         if(!phdr_dyna)
             return 0;
-        const ElfW(Shdr) *shdr_dynstr = GetShdr(elf, ".dynstr");
-        if(!shdr_dynstr)
+        const char *strtab_dyn = GetDynStr(elf);
+        if(!strtab_dyn)
             return 0;
 
-        const char *strtab_dyn = (char *)elf + shdr_dynstr->sh_offset;
         const ElfW(Dyn) *dyn = (ElfW(Dyn) *)(elf + phdr_dyna->p_offset);
         for(ElfW(Word) i = 0; i < phdr_dyna->p_filesz / sizeof(ElfW(Dyn)); ++i, ++dyn)
         {
